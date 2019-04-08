@@ -24,7 +24,7 @@ class Featurizer():
     self.data_loader = data_loader
     self.num_feature = self.hparams.lan_size
 
-  def get_state(self, src, src_len, trg, nmt_model):
+  def get_state(self, src, src_len, trg):
     existed_src = (np.array(src_len) > 2).astype(int).sum(axis=0)
     if self.hparams.feature_type == "lan_dist":
       src_dist = existed_src * self.data_loader.lan_dist_vec / 100
@@ -49,7 +49,7 @@ class EmbFeaturizer():
     self.src_emb = src_emb
     self.trg_emb = trg_emb
 
-  def get_state(self, src, src_len, trg, nmt_model):
+  def get_state(self, src, src_len, trg):
     existed_src = (np.array(src_len) > 2).astype(int).sum(axis=0)
     # special case of batch 1
     src = src[0]

@@ -295,7 +295,7 @@ def get_grad_cos_all(model, data, crit):
     print(dists[j])
   data.update_prob_list(dists)
 
-def eval(model, data, crit, step, hparams, args, eval_bleu=False,
+def eval(model, data, step, hparams, args, eval_bleu=False,
          valid_batch_size=20, tr_logits=None):
   print("Eval at step {0}. valid_batch_size={1}".format(step, valid_batch_size))
   model.hparams.decode = True
@@ -322,7 +322,11 @@ def eval(model, data, crit, step, hparams, args, eval_bleu=False,
       y[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, x_char, y_char, file_idx=dev_file_index, step=step, x_rank=x_rank)
     logits = logits.view(-1, hparams.trg_vocab_size)
     labels = y[:,1:].contiguous().view(-1)
-    val_loss, val_acc = get_performance(crit, logits, labels, hparams)
+    val_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=hparams.pad_id, reduction="none").sum()
+    mask = (labels == hparams.pad_id)
+    _, preds = torch.max(logits, dim=1)
+    val_acc = torch.eq(preds, labels).int().masked_fill_(mask, 0).sum()
+   
     n_batches += batch_size
     valid_loss += val_loss.item()
     valid_acc += val_acc.item()

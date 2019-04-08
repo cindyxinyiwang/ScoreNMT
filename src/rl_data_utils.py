@@ -6,8 +6,7 @@ import subprocess
 
 import torch
 from torch.autograd import Variable
-# multilingual data utils
-
+from utils import *
 
 class RLDataUtil(object):
   def __init__(self, hparams, shuffle=True):
@@ -77,40 +76,21 @@ class RLDataUtil(object):
     src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
     trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
     self.data_raw_trg = []
-    if self.hparams.nmt_train or self.hparams.nmt_train_prob_lr:
-      pass
-    elif self.hparams.decode:
-      trg_lines = open(trg, 'r').readlines()
-      lan_src_counts = self.load_rl_decode(src, trg, trg_lines)
-      print("language statistics: ")
-      print(lan_src_counts)
-      # batch the raw instances
-      self.raw_start_indices = []
-      self.raw_end_indices = []
-      start_index, end_index = 0, 0
-      while end_index < len(self.data_raw_trg):
-        end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
-        self.raw_start_indices.append(start_index)
-        self.raw_end_indices.append(end_index)
-        start_index = end_index
-    else:
-      src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
-      trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
-      trg_lines = open(trg, 'r').readlines()
-      lan_src_counts = self.load_rl_train(src, trg, trg_lines)
-      print("language statistics: ")
-      print(lan_src_counts)
-      # batch the raw instances
-      self.raw_start_indices = []
-      self.raw_end_indices = []
-      start_index, end_index = 0, 0
-      while end_index < len(self.data_raw_trg):
-        end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
-        self.raw_start_indices.append(start_index)
-        self.raw_end_indices.append(end_index)
-        start_index = end_index
-      # load the base language
-
+    trg_lines = open(trg, 'r').readlines()
+    lan_src_counts = self.load_raw_data_list(src, trg, trg_lines)
+    print("language statistics: ")
+    print(lan_src_counts)
+    # batch the raw instances
+    self.raw_start_indices = []
+    self.raw_end_indices = []
+    start_index, end_index = 0, 0
+    while end_index < len(self.data_raw_trg):
+      end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
+      self.raw_start_indices.append(start_index)
+      self.raw_end_indices.append(end_index)
+      start_index = end_index
+    self.cur_line = 0
+    
     # lan dist vec
     self.hparams.base_lan_id = self.lan_w2i[self.hparams.base_lan]
     self.lan_dist_vec = []
@@ -418,11 +398,33 @@ class RLDataUtil(object):
           prob = prob.cuda()
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, prob, batch_size, eop
  
-  def next_nmt_train(self):
-    src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
-    trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
+  def load_nmt_train_actor(self, start_index, num, featurizer, actor):
+    end_index = min(start_index + num, len(self.data_raw_trg))
+    print(start_index, end_index)
+    self.x_train, self.y_train, self.lan_id = [], [], []
+    for idx in range(start_index, end_index):
+      src_list, trg, src_len = self.data_raw_src[idx], self.data_raw_trg[idx], self.data_src_len[idx]
+      
+      s = featurizer.get_state([src_list], [src_len], [trg])
+      a_logits = actor(s)
+      mask = 1 - s[1].byte()
+      a_logits.masked_fill_(mask, -float("inf"))
+      a, prob = sample_action(a_logits, temp=1., log=False)
+      if idx % 500 == 0:
+        print(s[1])
+        print(prob)
+      for src_idx, p in enumerate(prob):
+        if random.random() < p:
+          self.lan_id.append(src_idx)
+          self.x_train.append(src_list[src_idx])
+          self.y_train.append(trg)
+    
+  def next_sample_nmt_train(self, featurizer, actor):
     while True:
-      self.load_nmt_train(src, trg)
+      self.load_nmt_train_actor(self.cur_line, self.hparams.train_score_every, featurizer, actor)
+      self.cur_line = self.cur_line + self.hparams.train_score_every
+      if self.cur_line > len(self.data_raw_trg): 
+        self.cur_line = 0
       # get start_indices
       self.train_start_indices, self.train_end_indices = [], []
       if self.hparams.batcher == "word":
@@ -460,6 +462,58 @@ class RLDataUtil(object):
         x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
         y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
         batch_size = len(x)
+        eop = (self.cur_line == 0 and step_b == len(batch_indices)-1)
+        eob = (step_b == len(batch_indices)-1)
+        save_grad = (len(batch_indices) - step_b <= 50)
+        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop, eob, save_grad
+
+  #def next_nmt_train(self, actor):
+  def next_nmt_train(self):
+    src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
+    trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
+    while True:
+      self.load_nmt_train(src, trg)
+      #self.load_nmt_train_actor(self.cur_line, self.hparams.train_score_every, actor)
+      #self.cur_line = self.cur_line + self.hparams.train_score_every
+      #if self.cur_line > len(self.raw_trg_lines): self.cur_line = 0
+      # get start_indices
+      self.train_start_indices, self.train_end_indices = [], []
+      if self.hparams.batcher == "word":
+        start_index, end_index, count = 0, 0, 0
+        while True:
+          count += (len(self.x_train[end_index])+ len(self.y_train[end_index]))
+          end_index += 1
+          if end_index >= len(self.x_train):
+            self.train_start_indices.append(start_index)
+            self.train_end_indices.append(end_index)
+            break
+          if count > self.hparams.batch_size:
+            self.train_start_indices.append(start_index)
+            self.train_end_indices.append(end_index)
+            count = 0
+            start_index = end_index
+      elif self.hparams.batcher == "sent":
+        start_index, end_index, count = 0, 0, 0
+        while end_index < len(x_len):
+          end_index = min(start_index + self.hparams.batch_size, len(x_len))
+          self.train_start_indices.append(start_index)
+          self.train_end_indices.append(end_index)
+          start_index = end_index
+      else:
+        print("unknown batcher")
+        exit(1)
+
+      batch_indices = np.random.permutation(len(self.train_start_indices))
+      for step_b, batch_idx in enumerate(batch_indices):
+        start_idx, end_idx = self.train_start_indices[batch_idx], self.train_end_indices[batch_idx]
+        x, y, lan_id = self.x_train[start_idx:end_idx], self.y_train[start_idx:end_idx], self.lan_id[start_idx:end_idx]
+        if self.shuffle:
+          (x, y, lan_id), _ = self.sort_by_xlen([x, y, lan_id])
+        # pad
+        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
+        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
+        batch_size = len(x)
+        #eop = (self.cur_line == 0 and step_b == len(batch_indices)-1)
         eop = (step_b == len(batch_indices)-1)
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop
 

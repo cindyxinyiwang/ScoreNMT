@@ -225,6 +225,8 @@ parser.add_argument("--feature_type", type=str, default="lan_dist", help="[lan_d
 parser.add_argument("--actor_type", type=str, default="base", help="[base|emb]")
 parser.add_argument("--add_bias", type=int, default=1, help="whether to add bias to actor logits")
 parser.add_argument("--imitate_episode", type=int, default=0, help="episodes to imitate")
+
+parser.add_argument("--train_score_every", type=int, default=10000, help="episodes to imitate")
 args = parser.parse_args()
 
 def train():
@@ -394,6 +396,7 @@ def train():
       actor_type=args.actor_type,
       add_bias=args.add_bias,
       imitate_episode=args.imitate_episode,
+      train_score_every=args.train_score_every,
     )
   # build or load model
   if args.nmt_train:
