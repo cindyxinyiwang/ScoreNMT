@@ -464,7 +464,8 @@ class RLDataUtil(object):
         batch_size = len(x)
         eop = (self.cur_line == 0 and step_b == len(batch_indices)-1)
         eob = (step_b == len(batch_indices)-1)
-        save_grad = (len(batch_indices) - step_b <= 50)
+        save_grad = (len(batch_indices) - step_b <=
+            self.hparams.record_grad_step)
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop, eob, save_grad
 
   #def next_nmt_train(self, actor):
@@ -519,35 +520,17 @@ class RLDataUtil(object):
 
   def next_raw_example(self):
     max_step = self.hparams.agent_subsample_line/self.hparams.raw_batch_size
-    print(self.hparams.decode)
     while True:
       if self.hparams.decode:
         batch_indices = [i for i in range(len(self.raw_start_indices))]
       else:
-        if self.hparams.burn_in_size > 0 or self.hparams.random_rl_train:
-          src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
-          trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
-          trg_lines = open(trg, 'r').readlines()
-          lan_src_counts = self.load_rl_train(src, trg, trg_lines)
-          print("language statistics: ")
-          print(lan_src_counts)
-          # batch the raw instances
-          self.raw_start_indices = []
-          self.raw_end_indices = []
-          start_index, end_index = 0, 0
-          while end_index < len(self.data_raw_trg):
-            end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
-            self.raw_start_indices.append(start_index)
-            self.raw_end_indices.append(end_index)
-            start_index = end_index
-
-        batch_indices = [i for i in range(len(self.raw_start_indices))]
+        batch_indices = np.random.permutation(len(self.raw_start_indices))[:self.hparams.agent_subsample_line]
         #batch_indices = np.random.permutation(len(self.raw_start_indices))
       for step_b, batch_idx in enumerate(batch_indices):
         start_idx, end_idx = self.raw_start_indices[batch_idx], self.raw_end_indices[batch_idx]
         src, trg = self.data_raw_src[start_idx:end_idx], self.data_raw_trg[start_idx:end_idx]
         src_len = self.data_src_len[start_idx:end_idx]
-        eop = (step_b == len(self.raw_start_indices)-1)
+        eop = (step_b == len(batch_indices)-1)
         yield src, src_len, trg, (step_b % max_step) / max_step, eop
 
   def next_score_decode(self):

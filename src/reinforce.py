@@ -205,7 +205,8 @@ class ReinforceTrainer():
       a_logits.masked_fill_(mask, -float("inf"))
       
       loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
-      loss = (loss * grad_scale * 0.01).masked_fill_(mask, 0.).sum() 
+      loss = (loss * grad_scale * 0.01).masked_fill_(mask,
+          0.).sum().div_(self.hparams.agent_subsample_line) 
       cur_loss = loss.item()
       loss.backward()
       self.actor_optim.step()
@@ -219,6 +220,7 @@ class ReinforceTrainer():
     batch_count = 0
     step = 0
     cur_dev_ppl = 12
+    set_lr(self.actor_optim, 0.001)
     for eps in range(self.hparams.imitate_episode):
       for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example():
         s = self.featurizer.get_state(src, src_len, trg)
@@ -237,10 +239,11 @@ class ReinforceTrainer():
         loss.backward()
         self.actor_optim.step()
         self.actor_optim.zero_grad()
-        #if step % self.hparams.print_every == 0:
-        #  print("step={} imitation loss={}".format(step, cur_loss))
+        if step % self.hparams.print_every == 0:
+          print("step={} imitation loss={}".format(step, cur_loss))
 
         if eop: break  
+    set_lr(self.actor_optim, self.hparams.lr_q)
     return
 
   def init_train_nmt(self):
@@ -346,7 +349,7 @@ class ReinforceTrainer():
       if eval_now:
         based_on_bleu = hparams.eval_bleu and self.best_val_ppl[0] is not None and self.best_val_ppl[0] <= hparams.ppl_thresh
         with torch.no_grad():
-          val_ppl, val_bleu, ppl_list, bleu_list = eval(model, data_util, self.step, hparams, hparams, eval_bleu=based_on_bleu, valid_batch_size=hparams.valid_batch_size, tr_logits=logits)	
+          val_ppl, val_bleu, ppl_list, bleu_list = eval(model, self.data_loader, self.step, hparams, hparams, eval_bleu=based_on_bleu, valid_batch_size=hparams.valid_batch_size, tr_logits=logits)	
         for i in range(len(ppl_list)):
           if based_on_bleu:
             if self.best_val_bleu[i] is None or self.best_val_bleu[i] <= bleu_list[i]:

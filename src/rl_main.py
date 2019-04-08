@@ -227,6 +227,7 @@ parser.add_argument("--add_bias", type=int, default=1, help="whether to add bias
 parser.add_argument("--imitate_episode", type=int, default=0, help="episodes to imitate")
 
 parser.add_argument("--train_score_every", type=int, default=10000, help="episodes to imitate")
+parser.add_argument("--record_grad_step", type=int, default=50, help="episodes to imitate")
 args = parser.parse_args()
 
 def train():
@@ -397,6 +398,7 @@ def train():
       add_bias=args.add_bias,
       imitate_episode=args.imitate_episode,
       train_score_every=args.train_score_every,
+      record_grad_step=args.record_grad_step,
     )
   # build or load model
   if args.nmt_train:

@@ -70,7 +70,8 @@ class HeuristicActor(nn.Module):
     super(HeuristicActor, self).__init__()
     self.hparams = hparams
     hidden_size = hparams.d_hidden
-    self.lan_dist_vec = Variable(torch.FloatTensor(lan_dist_vec.tolist()) / 10)
+    #self.lan_dist_vec = Variable(torch.FloatTensor(lan_dist_vec.tolist()) / 10)
+    self.lan_dist_vec = Variable(torch.FloatTensor(lan_dist_vec.tolist()))
       
     self.bias = nn.Linear(1, self.hparams.lan_size, bias=False)
     self.bias.weight = torch.nn.Parameter(torch.FloatTensor([[self.hparams.bias for _ in range(self.hparams.lan_size)]]))
