@@ -231,6 +231,7 @@ parser.add_argument("--record_grad_step", type=int, default=50, help="episodes t
 
 parser.add_argument("--not_train_score", action="store_true", help="do not train the score function")
 parser.add_argument("--train_score_episode", type=int, default=1, help="how many updates to train the score")
+parser.add_argument("--refresh_base_grad", type=int, default=1, help="whether to refresh the grad on base lan before updating score")
 args = parser.parse_args()
 
 def train():
@@ -404,6 +405,7 @@ def train():
       record_grad_step=args.record_grad_step,
       not_train_score=args.not_train_score,
       train_score_episode=args.train_score_episode,
+      refresh_base_grad=args.refresh_base_grad,
     )
   # build or load model
   if args.nmt_train:
