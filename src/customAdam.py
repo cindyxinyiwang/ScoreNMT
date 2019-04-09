@@ -62,13 +62,13 @@ class customAdam(Optimizer):
                 if not "ave_grad" in param_state:
                     param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
                 if p.grad is None: continue
-                d_p = p.grad.data
-                #scale_0, scale_1 = torch.FloatTensor([0.05]), torch.FloatTensor([0.95])
-                #if self.hparams.cuda: 
-                #  scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
+                scale_0, scale_1 = torch.FloatTensor([0.05]), torch.FloatTensor([0.95])
+                if self.hparams.cuda: 
+                  scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
+                #d_p = p.grad.data
                 #param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
-                denom = exp_avg_sq.sqrt().add_(group['eps'])
-                param_state["ave_grad"][lan_id] = param_state['exp_avg'] / denom 
+                denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
+                param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*param_state['exp_avg'] / denom 
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
@@ -84,10 +84,10 @@ class customAdam(Optimizer):
                 for i in range(self.hparams.lan_size):
                   prod = param_state["ave_grad"][i] * param_state["ave_grad"][base_lan_id]
                   prod = prod.sum()
-                  norm = param_state["ave_grad"][i].norm(2) + param_state["ave_grad"][base_lan_id].norm(2)
+                  norm = param_state["ave_grad"][i].norm(2) ** 2
                   cosine_prod[i] = cosine_prod[i] + prod  
                   cosine_norm[i] = cosine_norm[i] + norm  
-        cosine_dist = [p / (n+1e-10) for p, n in zip(cosine_prod, cosine_norm)]
+        cosine_dist = [p / (n.sqrt()*cosine_norm[base_lan_id].sqrt() +1e-10) for p, n in zip(cosine_prod, cosine_norm)]
         return cosine_dist
 
     def step(self, closure=None):
