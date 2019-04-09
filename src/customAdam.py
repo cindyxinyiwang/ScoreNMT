@@ -63,10 +63,12 @@ class customAdam(Optimizer):
                     param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
                 if p.grad is None: continue
                 d_p = p.grad.data
-                scale_0, scale_1 = torch.FloatTensor([0.05]), torch.FloatTensor([0.95])
-                if self.hparams.cuda: 
-                  scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
-                param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
+                #scale_0, scale_1 = torch.FloatTensor([0.05]), torch.FloatTensor([0.95])
+                #if self.hparams.cuda: 
+                #  scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
+                #param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
+                denom = exp_avg_sq.sqrt().add_(group['eps'])
+                param_state["ave_grad"][lan_id] = param_state['exp_avg'] / denom 
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
