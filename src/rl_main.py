@@ -228,6 +228,9 @@ parser.add_argument("--imitate_episode", type=int, default=0, help="episodes to 
 
 parser.add_argument("--train_score_every", type=int, default=10000, help="episodes to imitate")
 parser.add_argument("--record_grad_step", type=int, default=50, help="episodes to imitate")
+
+parser.add_argument("--not_train_score", action="store_true", help="do not train the score function")
+parser.add_argument("--train_score_episode", type=int, default=1, help="how many updates to train the score")
 args = parser.parse_args()
 
 def train():
@@ -399,6 +402,8 @@ def train():
       imitate_episode=args.imitate_episode,
       train_score_every=args.train_score_every,
       record_grad_step=args.record_grad_step,
+      not_train_score=args.not_train_score,
+      train_score_episode=args.train_score_episode,
     )
   # build or load model
   if args.nmt_train:
