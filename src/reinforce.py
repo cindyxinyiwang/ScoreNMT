@@ -15,6 +15,7 @@ from state_data import *
 from featurizer import *
 from actor import *
 from customAdam import *
+from customSGD import *
 
 from collections import defaultdict, deque
 import copy
@@ -123,7 +124,7 @@ class ReinforceTrainer():
       num_params = count_params(trainable_params)
       print("NMT Model has {0} params".format(num_params))
       if self.hparams.model_optimizer == "SGD":
-        self.nmt_optim = torch.optim.SGD(trainable_params, lr=self.hparams.lr)
+        self.nmt_optim = customSGD(trainable_params, hparams, lr=self.hparams.lr)
       elif self.hparams.model_optimizer == "ADAM":
         self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
       else:
