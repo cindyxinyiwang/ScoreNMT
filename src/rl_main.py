@@ -232,6 +232,11 @@ parser.add_argument("--record_grad_step", type=int, default=50, help="episodes t
 parser.add_argument("--not_train_score", action="store_true", help="do not train the score function")
 parser.add_argument("--train_score_episode", type=int, default=1, help="how many updates to train the score")
 parser.add_argument("--refresh_base_grad", type=int, default=1, help="whether to refresh the grad on base lan before updating score")
+
+parser.add_argument("--model_optimizer", type=str, default="ADAM", help="[SGD|ADAM]")
+
+parser.add_argument("--cosine_schedule_max_step", type=int, default=0, help="the max step for cosine lr anneal")
+parser.add_argument("--schedule_restart", type=int, default=1, help="[1|0] whether to restart schedule at eop")
 args = parser.parse_args()
 
 def train():
@@ -406,6 +411,9 @@ def train():
       not_train_score=args.not_train_score,
       train_score_episode=args.train_score_episode,
       refresh_base_grad=args.refresh_base_grad,
+      model_optimizer=args.model_optimizer,
+      cosine_schedule_max_step=args.cosine_schedule_max_step,
+      schedule_restart=args.schedule_restart,
     )
   # build or load model
   if args.nmt_train:
