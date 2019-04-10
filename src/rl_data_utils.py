@@ -423,7 +423,7 @@ class RLDataUtil(object):
     while True:
       self.load_nmt_train_actor(self.cur_line, self.hparams.train_score_every, featurizer, actor)
       self.cur_line = self.cur_line + self.hparams.train_score_every
-      if self.cur_line > len(self.data_raw_trg): 
+      if self.cur_line >= len(self.data_raw_trg): 
         self.cur_line = 0
       # get start_indices
       self.train_start_indices, self.train_end_indices = [], []

@@ -122,8 +122,17 @@ class ReinforceTrainer():
         p for p in self.nmt_model.parameters() if p.requires_grad]
       num_params = count_params(trainable_params)
       print("NMT Model has {0} params".format(num_params))
-      self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
+      if self.hparams.model_optimizer == "SGD":
+        self.nmt_optim = torch.optim.SGD(trainable_params, lr=self.hparams.lr)
+      elif self.hparams.model_optimizer == "ADAM":
+        self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
+      else:
+        print("optimizer not defined")
+        exit(0)
       
+      if self.hparams.cosine_schedule_max_step:
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
+
       trainable_params = [
         p for p in self.actor.parameters() if p.requires_grad]
       num_params = count_params(trainable_params)
@@ -302,7 +311,7 @@ class ReinforceTrainer():
       total_loss += cur_nmt_loss.sum().item()
       cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum(-1).div_(batch_size * hparams.update_batch)
      
-      if save_grad:
+      if save_grad and not self.hparams.not_train_score:
         # save the gradients to nmt moving average
         for batch_id in range(batch_size):
           batch_lan_id = lan_id[batch_id]
@@ -324,11 +333,15 @@ class ReinforceTrainer():
         optim.step()
         optim.zero_grad()
         update_batch_size = 0
+        if self.hparams.cosine_schedule_max_step:
+          self.scheduler.step()
       # clean up GPU memory
       if self.step % hparams.clean_mem_every == 0:
         gc.collect()
       if eop: 
         self.epoch += 1
+        if self.hparams.cosine_schedule_max_step and self.hparams.schedule_restart:
+          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
       #  get_grad_cos_all(model, data, crit)
       if (self.step / hparams.update_batch) % hparams.log_every == 0:
         curr_time = time.time()
@@ -336,7 +349,10 @@ class ReinforceTrainer():
         elapsed = (curr_time - log_start_time) / 60.0
         log_string = "ep={0:<3d}".format(self.epoch)
         log_string += " steps={0:<6.2f}".format((self.step / hparams.update_batch) / 1000)
-        log_string += " lr={0:<9.7f}".format(self.lr)
+        if self.hparams.cosine_schedule_max_step:
+          log_string += " lr={0:<9.7f}".format(self.scheduler.get_lr()[0])
+        else:
+          log_string += " lr={0:<9.7f}".format(self.lr)
         log_string += " loss={0:<7.2f}".format(cur_nmt_loss.sum().item())
         log_string += " |g|={0:<5.2f}".format(grad_norm)
   
