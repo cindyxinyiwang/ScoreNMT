@@ -204,6 +204,19 @@ class ReinforceTrainer():
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(self.hparams.base_lan_id)
         break
+    elif self.hparams.refresh_all_grad:
+      for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_refresh_data():
+        logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
+        logits = logits.view(-1, self.hparams.trg_vocab_size)
+        labels = y_train[:,1:].contiguous().view(-1)
+        cur_nmt_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=self.hparams.pad_id, reduction="none")
+        cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
+        # save the gradients to nmt moving average
+        cur_nmt_loss.backward()
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
+        self.nmt_optim.save_gradients(lan_id[0])
+        if eop:
+          break
 
     grad_cosine_sim = self.nmt_optim.get_cosine_sim()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)

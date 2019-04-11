@@ -309,6 +309,24 @@ class RLDataUtil(object):
       if self.hparams.cuda: ret = ret.cuda()
     return ret
 
+  def next_refresh_data(self):
+    while True:
+      for lan_id in range(self.hparams.lan_size):
+        x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[lan_id],
+            self.train_trg_file_list[lan_id], 0, outprint=True, load_full=False,
+            is_train=False, sample=True, max_line=32)
+        start_idx, end_idx = 0, 31 
+        x, y = x_train[start_idx:end_idx], y_train[start_idx:end_idx]
+        batch_size = len(x)
+        lan_id_list =  [lan_id for _ in range(batch_size)]
+        if self.shuffle:
+          (x, y, lan_id_list), _ = self.sort_by_xlen([x, y, lan_id_list])
+        # pad
+        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
+        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
+        eop = (lan_id == self.hparams.lan_size-1)
+        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id_list, eop
+ 
   def next_base_data(self):
     x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[self.hparams.base_lan_id], self.train_trg_file_list[self.hparams.base_lan_id], 0, outprint=True, load_full=True)
     start_indices, end_indices = [], []
@@ -413,16 +431,27 @@ class RLDataUtil(object):
       if idx % 500 == 0:
         print(s[1])
         print(prob)
-      for src_idx, p in enumerate(prob):
-        if random.random() < p:
-          self.lan_id.append(src_idx)
-          self.x_train.append(src_list[src_idx])
-          self.y_train.append(trg)
-    
+      #for src_idx, p in enumerate(prob):
+      #  if random.random() < p:
+      #    self.lan_id.append(src_idx)
+      #    self.x_train.append(src_list[src_idx])
+      #    self.y_train.append(trg)
+      prob = [float(repr(p)) for p in prob]
+      prob = np.array(prob) / sum(prob)
+      src_idx = np.random.choice(self.hparams.lan_size, p=prob)
+      self.lan_id.append(src_idx)
+      self.x_train.append(src_list[src_idx])
+      self.y_train.append(trg)
+   
   def next_sample_nmt_train(self, featurizer, actor):
     while True:
-      self.load_nmt_train_actor(self.cur_line, self.hparams.train_score_every, featurizer, actor)
-      self.cur_line = self.cur_line + self.hparams.train_score_every
+      if self.hparams.init_load_time > 0:
+        self.hparams.init_load_time -= 1
+        line_num = self.hparams.init_train_score_every
+      else:
+        line_num = self.hparams.train_score_every
+      self.load_nmt_train_actor(self.cur_line, line_num, featurizer, actor)
+      self.cur_line = self.cur_line + line_num
       if self.cur_line >= len(self.data_raw_trg): 
         self.cur_line = 0
       # get start_indices

@@ -62,7 +62,7 @@ class customAdam(Optimizer):
                 if not "ave_grad" in param_state:
                     param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
                 if p.grad is None: continue
-                scale_0, scale_1 = torch.FloatTensor([0.05]), torch.FloatTensor([0.95])
+                scale_0, scale_1 = torch.FloatTensor([0.15]), torch.FloatTensor([0.85])
                 if self.hparams.cuda: 
                   scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
                 d_p = p.grad.data
