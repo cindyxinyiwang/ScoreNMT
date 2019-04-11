@@ -431,17 +431,17 @@ class RLDataUtil(object):
       if idx % 500 == 0:
         print(s[1])
         print(prob)
-      #for src_idx, p in enumerate(prob):
-      #  if random.random() < p:
-      #    self.lan_id.append(src_idx)
-      #    self.x_train.append(src_list[src_idx])
-      #    self.y_train.append(trg)
-      prob = [float(repr(p)) for p in prob]
-      prob = np.array(prob) / sum(prob)
-      src_idx = np.random.choice(self.hparams.lan_size, p=prob)
-      self.lan_id.append(src_idx)
-      self.x_train.append(src_list[src_idx])
-      self.y_train.append(trg)
+      for src_idx, p in enumerate(prob):
+        if random.random() < p:
+          self.lan_id.append(src_idx)
+          self.x_train.append(src_list[src_idx])
+          self.y_train.append(trg)
+      #prob = [float(repr(p)) for p in prob]
+      #prob = np.array(prob) / sum(prob)
+      #src_idx = np.random.choice(self.hparams.lan_size, p=prob)
+      #self.lan_id.append(src_idx)
+      #self.x_train.append(src_list[src_idx])
+      #self.y_train.append(trg)
    
   def next_sample_nmt_train(self, featurizer, actor):
     while True:

@@ -65,10 +65,10 @@ class customAdam(Optimizer):
                 scale_0, scale_1 = torch.FloatTensor([0.15]), torch.FloatTensor([0.85])
                 if self.hparams.cuda: 
                   scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
-                d_p = p.grad.data
-                param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
-                #denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
-                #param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*param_state['exp_avg'] / denom 
+                #d_p = p.grad.data
+                #param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
+                denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
+                param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*param_state['exp_avg'] / denom 
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
