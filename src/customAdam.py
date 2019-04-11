@@ -30,6 +30,9 @@ class customAdam(Optimizer):
     def __init__(self, params, hparams, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=0, amsgrad=False):
         self.hparams = hparams
+        self.scale_0, self.scale_1 = torch.FloatTensor([self.hparams.scale_0]), torch.FloatTensor([self.hparams.scale_1])
+        if self.hparams.cuda: 
+          self.scale_0, self.scale_1 = self.scale_0.cuda(), self.scale_1.cuda()
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -62,13 +65,13 @@ class customAdam(Optimizer):
                 if not "ave_grad" in param_state:
                     param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
                 if p.grad is None: continue
-                scale_0, scale_1 = torch.FloatTensor([0.15]), torch.FloatTensor([0.85])
-                if self.hparams.cuda: 
-                  scale_0, scale_1 = scale_0.cuda(), scale_1.cuda()
-                #d_p = p.grad.data
-                #param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
-                denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
-                param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*param_state['exp_avg'] / denom 
+                
+                if self.hparams.adam_raw_grad:
+                  d_p = p.grad.data
+                  param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
+                else:
+                  denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
+                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*param_state['exp_avg'] / denom 
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
