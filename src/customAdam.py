@@ -78,7 +78,7 @@ class customAdam(Optimizer):
                   d_p = p.grad.data
                   cur_grad = d_p - param_state["prev_grad"]
                   param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
-                  param_state["prev_grad"] = d_p
+                  param_state["prev_grad"] = d_p.clone()
                 else:
                   denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
                   param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*param_state['exp_avg'] / denom 
