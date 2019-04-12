@@ -41,13 +41,15 @@ python3.6 src/rl_main.py \
   --lr 0.001 \
   --lr_q 0.0001 \
   --n_train_epochs=20 \
+  --refresh_base_grad=0 \
+  --refresh_all_grad=1 \
   --dropout 0.3 \
   --max_len 380 \
   --agent_subsample_line 160 \
   --train_score_episode=10 \
   --print_every 50 \
   --train_score_every=5000 \
-  --record_grad_step=100 \
+  --record_grad_step=10 \
   --data_name="tiny" \
   --d_hidden 32 \
   --adam_raw_grad=1 \

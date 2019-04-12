@@ -40,6 +40,8 @@ python3.6 src/rl_main.py \
   --lr_dec 1.0 \
   --lr 0.001 \
   --lr_q 0.00001 \
+  --refresh_base_grad=0 \
+  --refresh_all_grad=1 \
   --n_train_epochs=20 \
   --dropout 0.3 \
   --max_len 380 \
