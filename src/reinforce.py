@@ -219,6 +219,7 @@ class ReinforceTrainer():
           break
 
     grad_cosine_sim = self.nmt_optim.get_cosine_sim()
+    self.nmt_optim.zero_prev_grad()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)
     print(grad_scale.data)
     for eps in range(self.hparams.train_score_episode):
@@ -330,12 +331,11 @@ class ReinforceTrainer():
         for batch_id in range(batch_size):
           batch_lan_id = lan_id[batch_id]
           cur_nmt_loss[batch_id].backward(retain_graph=True)
-          grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), hparams.clip_grad)
           optim.save_gradients(batch_lan_id)
       else:
         cur_nmt_loss = cur_nmt_loss.sum()
         cur_nmt_loss.backward()
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), hparams.clip_grad)
+      grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), hparams.clip_grad)
 
       mask = (labels == hparams.pad_id)
       _, preds = torch.max(logits, dim=1)
@@ -346,6 +346,7 @@ class ReinforceTrainer():
       if self.step % hparams.update_batch == 0:
         optim.step()
         optim.zero_grad()
+        optim.zero_prev_grad()
         update_batch_size = 0
         if self.hparams.cosine_schedule_max_step:
           self.scheduler.step()

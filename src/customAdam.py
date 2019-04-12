@@ -50,6 +50,12 @@ class customAdam(Optimizer):
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
+    def zero_prev_grad(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                param_state = self.state[p]
+                param_state["prev_grad"] = torch.zeros_like(p.data)
+ 
     def save_gradients(self, lan_id):
         for group in self.param_groups:
             for p in group["params"]:
@@ -64,11 +70,15 @@ class customAdam(Optimizer):
                     param_state['max_exp_avg_sq'] = torch.zeros_like(p.data)
                 if not "ave_grad" in param_state:
                     param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
+                if not "prev_grad" in param_state:
+                    param_state["prev_grad"] = torch.zeros_like(p.data)
                 if p.grad is None: continue
                 
                 if self.hparams.adam_raw_grad:
                   d_p = p.grad.data
-                  param_state["ave_grad"][lan_id] = scale_0*param_state["ave_grad"][lan_id] + scale_1*d_p
+                  cur_grad = d_p - param_state["prev_grad"]
+                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
+                  param_state["prev_grad"] = d_p
                 else:
                   denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
                   param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*param_state['exp_avg'] / denom 
