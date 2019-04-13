@@ -205,6 +205,7 @@ class ReinforceTrainer():
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(self.hparams.base_lan_id)
         self.nmt_optim.zero_prev_grad()
+        self.nmt_optim.zero_grad()
         if eop:
           break
     elif self.hparams.refresh_all_grad:
@@ -219,6 +220,7 @@ class ReinforceTrainer():
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(lan_id[0])
         self.nmt_optim.zero_prev_grad()
+        self.nmt_optim.zero_grad()
         if eop:
           break
 
