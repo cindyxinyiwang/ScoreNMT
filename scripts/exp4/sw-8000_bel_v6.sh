@@ -39,7 +39,7 @@ python3.6 src/rl_main.py \
   --raw_batch_size 1 \
   --lr_dec 1.0 \
   --lr 0.001 \
-  --lr_q 0.0000001 \
+  --lr_q 0.0001 \
   --refresh_base_grad=0 \
   --refresh_all_grad=1 \
   --n_train_epochs=20 \
@@ -48,7 +48,7 @@ python3.6 src/rl_main.py \
   --agent_subsample_line 160 \
   --train_score_episode=100 \
   --print_every 50 \
-  --train_score_every=50000 \
+  --train_score_every=20000 \
   --record_grad_step=100 \
   --data_name="tiny" \
   --d_hidden 32 \
