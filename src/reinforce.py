@@ -203,7 +203,8 @@ class ReinforceTrainer():
         cur_nmt_loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(self.hparams.base_lan_id)
-        break
+        if eop:
+          break
     elif self.hparams.refresh_all_grad:
       for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_refresh_data():
         logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
