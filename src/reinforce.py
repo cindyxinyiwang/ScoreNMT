@@ -190,6 +190,7 @@ class ReinforceTrainer():
    
   def train_score(self):
     step = 0
+    self.nmt_optim.zero_prev_grad()
     # update the actor with graidents scaled by cosine similarity
     # first update on the base language
     if self.hparams.refresh_base_grad:
@@ -203,6 +204,7 @@ class ReinforceTrainer():
         cur_nmt_loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(self.hparams.base_lan_id)
+        self.nmt_optim.zero_prev_grad()
         if eop:
           break
     elif self.hparams.refresh_all_grad:
@@ -216,11 +218,13 @@ class ReinforceTrainer():
         cur_nmt_loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
         self.nmt_optim.save_gradients(lan_id[0])
+        self.nmt_optim.zero_prev_grad()
         if eop:
           break
 
     grad_cosine_sim = self.nmt_optim.get_cosine_sim()
     self.nmt_optim.zero_prev_grad()
+    self.nmt_optim.zero_grad()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)
     print(grad_scale.data)
     for eps in range(self.hparams.train_score_episode):
