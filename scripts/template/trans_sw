@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --gres=gpu:1
+#SBATCH --mem=18g
+##SBATCH --nodelist=compute-0-7
+#SBATCH -t 0
+
+#export PYTHONPATH="$(pwd)"
+#export CUDA_VISIBLE_DEVICES="2"
+
+#DDIR="/home/xinyiw/multv-nmt/" 
+#DDIR="/home/hyhieu/xinyiw/multv-nmt/" 
+DDIR="/home/hyhieu/xinyiw1/multv-nmt/" 
+
+#pids=()
+python3.6 src/translate.py \
+  --model_file="outputs_VERSION/NAME/final_nmt_model.pt" \
+  --hparams_file="outputs_VERSION/NAME/final_nmt_hparams.pt" \
+  --test_src_file_list  "$DDIR"data/IL_eng/ted-test.mtok.spmVSIZE.IL \
+  --test_trg_file_list  "$DDIR"data_moses/IL_eng/ted-test.mtok.spm8000.eng \
+  --test_file_idx_list "0" \
+  --cuda \
+  --merge_bpe \
+  --beam_size=5 \
+  --poly_norm_m=1 \
+  --max_len=200 \
+  --out_file="outputs_VERSION/NAME/ted-test-b5m1"  
+#  --out_file="outputs_exp3/sw-8000_bel_v8_a2/ted-test-b5m1" & 
+#
+#pids+=($!)
+#
+#for pid in ${pids[*]}; do
+#  wait $pid
+#done
