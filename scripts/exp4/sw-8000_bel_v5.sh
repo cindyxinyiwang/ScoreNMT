@@ -39,7 +39,7 @@ python3.6 src/rl_main.py \
   --raw_batch_size 1 \
   --lr_dec 1.0 \
   --lr 0.001 \
-  --lr_q 0.000001 \
+  --lr_q 0.0001 \
   --refresh_base_grad=0 \
   --refresh_all_grad=1 \
   --n_train_epochs=20 \
