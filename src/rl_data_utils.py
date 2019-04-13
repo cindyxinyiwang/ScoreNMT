@@ -314,19 +314,48 @@ class RLDataUtil(object):
       for lan_id in range(self.hparams.lan_size):
         x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[lan_id],
             self.train_trg_file_list[lan_id], 0, outprint=True, load_full=False,
-            is_train=False, sample=True, max_line=32)
-        start_idx, end_idx = 0, 31 
-        x, y = x_train[start_idx:end_idx], y_train[start_idx:end_idx]
-        batch_size = len(x)
-        lan_id_list =  [lan_id for _ in range(batch_size)]
-        if self.shuffle:
-          (x, y, lan_id_list), _ = self.sort_by_xlen([x, y, lan_id_list])
-        # pad
-        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
-        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-        eop = (lan_id == self.hparams.lan_size-1)
-        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id_list, eop
+            is_train=False, sample=True, max_line=self.hparams.refresh_num)
+
+        start_indices, end_indices = [], []
+        if self.hparams.batcher == "word":
+          start_index, end_index, count = 0, 0, 0
+          while True:
+            count += (len(x_train[end_index])+ len(y_train[end_index]))
+            end_index += 1
+            if end_index >= len(x_train):
+              start_indices.append(start_index)
+              end_indices.append(end_index)
+              break
+            if count > self.hparams.batch_size:
+              start_indices.append(start_index)
+              end_indices.append(end_index)
+              count = 0
+              start_index = end_index
+        elif self.hparams.batcher == "sent":
+          start_index, end_index, count = 0, 0, 0
+          while end_index < len(x_len):
+            end_index = min(start_index + self.hparams.batch_size, len(x_len))
+            start_indices.append(start_index)
+            end_indices.append(end_index)
+            start_index = end_index
+        else:
+          print("unknown batcher")
+          exit(1)
+        batch_indices = np.random.permutation(len(start_indices))
+        for step_b, batch_idx in enumerate(batch_indices):
+          start_idx, end_idx = start_indices[batch_idx], end_indices[batch_idx]
+          x, y = x_train[start_idx:end_idx], y_train[start_idx:end_idx]
+          batch_size = len(x)
+          lan_id_list =  [lan_id for _ in range(batch_size)]
+          if self.shuffle:
+            (x, y, lan_id_list), _ = self.sort_by_xlen([x, y, lan_id_list])
+          # pad
+          x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
+          y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
+          eop = (step_b == len(batch_indices)-1 and lan_id == self.hparams.lan_size-1)
+          yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id_list, eop
  
+
   def next_base_data(self):
     x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[self.hparams.base_lan_id], self.train_trg_file_list[self.hparams.base_lan_id], 0, outprint=True, load_full=True)
     start_indices, end_indices = [], []

@@ -233,6 +233,7 @@ parser.add_argument("--not_train_score", action="store_true", help="do not train
 parser.add_argument("--train_score_episode", type=int, default=1, help="how many updates to train the score")
 parser.add_argument("--refresh_base_grad", type=int, default=1, help="whether to refresh the grad on base lan before updating score")
 parser.add_argument("--refresh_all_grad", type=int, default=0, help="whether to refresh the grad on all lan before updating score")
+parser.add_argument("--refresh_num", type=int, default=30, help="the number of sentences to refresh")
 
 parser.add_argument("--model_optimizer", type=str, default="ADAM", help="[SGD|ADAM]")
 
