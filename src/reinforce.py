@@ -260,7 +260,7 @@ class ReinforceTrainer():
       a_logits.masked_fill_(mask, -float("inf"))
         
       loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
-      loss = (loss * grad_scale * 0.01).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
+      loss = (loss * grad_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
       cur_loss = loss.item()
       loss.backward()
       self.actor_optim.step()
