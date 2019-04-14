@@ -102,63 +102,75 @@ class ReinforceTrainer():
       num_params = count_params(trainable_params)
       print("NMT Model has {0} params".format(num_params))
       self.nmt_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
+      self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
+      self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
     else:
-      self.nmt_model = Seq2Seq(hparams, self.data_loader)
       print("Training RL...")
-      if self.hparams.actor_type == "base":
-        self.featurizer = Featurizer(hparams, self.data_loader)
-        self.actor = Actor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-      elif self.hparams.actor_type == "emb":
-        self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
-        self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
+      if self.hparams.load_model:
+        self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_model.pt")) 
+        self.nmt_optim = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_optim.pt")) 
+        self.actor = torch.load(os.path.join(self.hparams.output_dir, "actor.pt"))
+        self.actor_optim = torch.load(os.path.join(self.hparams.output_dir, "actor_optim.pt"))
+        if self.hparams.actor_type == "base":
+          self.featurizer = Featurizer(hparams, self.data_loader)
+        elif self.hparams.actor_type == "emb":
+          self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
+        self.start_time = time.time()
+        [self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch] = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_extras.pt"))
+        if self.hparams.cuda:
+         self.nmt_model = self.nmt_model.cuda()
+         self.actor = self.actor.cuda()
       else:
-        print("actor not implemented")
-        exit(0)
-      if self.hparams.imitate_episode:
-        self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-      
-      self.start_time = time.time()
-      self.init_train_q = True
-      trainable_params = [
-        p for p in self.nmt_model.parameters() if p.requires_grad]
-      num_params = count_params(trainable_params)
-      print("NMT Model has {0} params".format(num_params))
-      if self.hparams.model_optimizer == "SGD":
-        self.nmt_optim = customSGD(trainable_params, hparams, lr=self.hparams.lr)
-      elif self.hparams.model_optimizer == "ADAM":
-        self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
-      else:
-        print("optimizer not defined")
-        exit(0)
-      
-      if self.hparams.cosine_schedule_max_step:
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
+        self.nmt_model = Seq2Seq(hparams, self.data_loader)
+        if self.hparams.actor_type == "base":
+          self.featurizer = Featurizer(hparams, self.data_loader)
+          self.actor = Actor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        elif self.hparams.actor_type == "emb":
+          self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
+          self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
+        else:
+          print("actor not implemented")
+          exit(0)
+        if self.hparams.imitate_episode:
+          self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        
+        self.start_time = time.time()
+        trainable_params = [
+          p for p in self.nmt_model.parameters() if p.requires_grad]
+        num_params = count_params(trainable_params)
+        print("NMT Model has {0} params".format(num_params))
+        if self.hparams.model_optimizer == "SGD":
+          self.nmt_optim = customSGD(trainable_params, hparams, lr=self.hparams.lr)
+        elif self.hparams.model_optimizer == "ADAM":
+          self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
+        else:
+          print("optimizer not defined")
+          exit(0)
+        
+        if self.hparams.cosine_schedule_max_step:
+          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
 
-      trainable_params = [
-        p for p in self.actor.parameters() if p.requires_grad]
-      num_params = count_params(trainable_params)
-      print("Actor Model has {0} params".format(num_params))
-      self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
+        trainable_params = [
+          p for p in self.actor.parameters() if p.requires_grad]
+        num_params = count_params(trainable_params)
+        print("Actor Model has {0} params".format(num_params))
+        self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
 
-      if self.hparams.cuda:
-        self.nmt_model = self.nmt_model.cuda()
-        self.actor = self.actor.cuda()
+        if self.hparams.cuda:
+          self.nmt_model = self.nmt_model.cuda()
+          self.actor = self.actor.cuda()
 
-      self.cur_attempt = 0
-      self.lr = self.hparams.lr
-      self.best_val_ppl = None
-      if hparams.init_type == "uniform" and not hparams.model_type == "transformer":
-        print("initialize uniform with range {}".format(hparams.init_range))
-        for p in self.nmt_model.parameters():
-          p.data.uniform_(-hparams.init_range, hparams.init_range)
-      self.init_train_lr()
-    self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
-    self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
+        if hparams.init_type == "uniform" and not hparams.model_type == "transformer":
+          print("initialize uniform with range {}".format(hparams.init_range))
+          for p in self.nmt_model.parameters():
+            p.data.uniform_(-hparams.init_range, hparams.init_range)
+        self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
+        self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
+        self.step = 0
+        self.cur_attempt = 0
+        self.lr = self.hparams.lr
+        self.epoch = 0
 
-  def init_train_lr(self):
-    self.cur_temp = self.hparams.min_temp
-    self.cur_step = 0
-   
   def decode(self, output_file):
     max_step = 15
     train_step = 0
@@ -361,6 +373,9 @@ class ReinforceTrainer():
       if self.step % hparams.clean_mem_every == 0:
         gc.collect()
       if eop: 
+        if (self.epoch+1) % (self.hparams.agent_checkpoint_every) == 0:
+          agent_name = "actor_" + str((self.epoch+1) // self.hparams.agent_checkpoint_every) + ".pt"
+          agent_save_checkpoint(self.actor, hparams, hparams.output_dir, agent_name)
         self.epoch += 1
         if self.hparams.cosine_schedule_max_step and self.hparams.schedule_restart:
           self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
@@ -416,9 +431,9 @@ class ReinforceTrainer():
               self.cur_attempt += 1
           if save:
             if len(ppl_list) > 1:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr], model, optim, hparams, hparams.output_dir + "dev{}".format(i))
+              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim)
             else:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr], model, optim, hparams, hparams.output_dir)
+              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim)
           elif not hparams.lr_schedule and self.step >= hparams.n_warm_ups:
             self.lr = self.lr * hparams.lr_dec
             set_lr(optim, self.lr)
@@ -436,7 +451,6 @@ class ReinforceTrainer():
       if eob: break
 
   def train_rl_and_nmt(self):
-    self.init_train_nmt()
     # imitate a good policy agent first
     if self.hparams.imitate_episode:
       self.imitate_heuristic()

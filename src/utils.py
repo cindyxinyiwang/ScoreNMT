@@ -86,14 +86,20 @@ def save_checkpoint(model, agent, hparams, path, save_agent=False):
     torch.save(agent, os.path.join(path, "agent.pt"))
   torch.save(hparams, os.path.join(path, "hparams.pt"))
 
-def nmt_save_checkpoint(extras, model, optim, hparams, path, actor=None):
+def agent_save_checkpoint(agent, hparams, path, agent_name):
+  print("Saving agent to '{0}'".format(path))
+  torch.save(agent, os.path.join(path, agent_name))
+  torch.save(hparams, os.path.join(path, "hparams.pt"))
+
+def nmt_save_checkpoint(extras, model, optim, hparams, path, actor, actor_optim):
   print("Saving model to '{0}'".format(path))
   torch.save(model, os.path.join(path, "final_nmt_model.pt"))
   torch.save(hparams, os.path.join(path, "final_nmt_hparams.pt"))
   torch.save(extras, os.path.join(path, "final_nmt_extras.pt"))
   torch.save(optim, os.path.join(path, "final_nmt_optim.pt"))
-  if actor is not None:
-    torch.save(actor, os.path.join(path, "actor.pt"))
+  torch.save(actor, os.path.join(path, "actor.pt"))
+  torch.save(actor_optim, os.path.join(path, "actor_optim.pt"))
+  #torch.save(actor, os.path.join(path, actor_name))
 
 
 class Logger(object):

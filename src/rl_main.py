@@ -247,6 +247,7 @@ parser.add_argument("--scale_0", type=float, default=0.05, help="scale for past 
 parser.add_argument("--scale_1", type=float, default=0.95, help="scale for current gradient")
 
 parser.add_argument("--adam_raw_grad", type=int, default=0, help="[0|1] whether to use raw grad for adam")
+parser.add_argument("--agent_checkpoint_every", type=int, default=20, help="save agent every n epoch")
 args = parser.parse_args()
 
 def train():
