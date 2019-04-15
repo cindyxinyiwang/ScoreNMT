@@ -46,7 +46,7 @@ class customAdam(Optimizer):
         super(customAdam, self).__init__(params, defaults)
 
     def __setstate__(self, state):
-        super(Adam, self).__setstate__(state)
+        super(customAdam, self).__setstate__(state)
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
@@ -74,14 +74,14 @@ class customAdam(Optimizer):
                     param_state["prev_grad"] = torch.zeros_like(p.data)
                 if p.grad is None: continue
                 
+                d_p = p.grad.data
+                cur_grad = d_p - param_state["prev_grad"]
                 if self.hparams.adam_raw_grad:
-                  d_p = p.grad.data
-                  cur_grad = d_p - param_state["prev_grad"]
                   param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
-                  param_state["prev_grad"] = d_p.clone()
                 else:
                   denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
-                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*param_state['exp_avg'] / denom 
+                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad / denom 
+                param_state["prev_grad"] = d_p.clone()
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
