@@ -248,6 +248,8 @@ parser.add_argument("--scale_1", type=float, default=0.95, help="scale for curre
 
 parser.add_argument("--adam_raw_grad", type=int, default=0, help="[0|1] whether to use raw grad for adam")
 parser.add_argument("--agent_checkpoint_every", type=int, default=20, help="save agent every n epoch")
+
+parser.add_argument("--grad_dist", type=str, default="cosine", help="[cosine|dot_prod]")
 args = parser.parse_args()
 
 def train():
