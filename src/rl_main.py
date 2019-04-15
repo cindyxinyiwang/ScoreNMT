@@ -250,6 +250,7 @@ parser.add_argument("--adam_raw_grad", type=int, default=0, help="[0|1] whether 
 parser.add_argument("--agent_checkpoint_every", type=int, default=20, help="save agent every n epoch")
 
 parser.add_argument("--grad_dist", type=str, default="cosine", help="[cosine|dot_prod]")
+parser.add_argument("--reward_scale", type=float, default=1, help="scale of the gradient sim")
 args = parser.parse_args()
 
 def train():
