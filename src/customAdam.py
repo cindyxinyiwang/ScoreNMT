@@ -53,35 +53,57 @@ class customAdam(Optimizer):
     def zero_prev_grad(self):
         for group in self.param_groups:
             for p in group["params"]:
-                param_state = self.state[p]
-                param_state["prev_grad"] = torch.zeros_like(p.data)
+                state = self.state[p]
+                state["prev_grad"] = torch.zeros_like(p.data)
+                state["exp_avg_grad"] = state["exp_avg"].clone()
+                state["exp_avg_sq_grad"] = state["exp_avg_sq"].clone()
  
     def save_gradients(self, lan_id):
         for group in self.param_groups:
             for p in group["params"]:
-                param_state = self.state[p]
-                if len(param_state) == 0:
-                    param_state['step'] = 0
+                state = self.state[p]
+                if len(state) == 0:
+                    state['step'] = 0
                     # Exponential moving average of gradient values
-                    param_state['exp_avg'] = torch.zeros_like(p.data)
+                    state['exp_avg'] = torch.zeros_like(p.data)
+                    # Exponential moving average of gradient values for calculate grad sim
+                    state['exp_avg_grad'] = torch.zeros_like(p.data)
                     # Exponential moving average of squared gradient values
-                    param_state['exp_avg_sq'] = torch.zeros_like(p.data)
+                    state['exp_avg_sq'] = torch.zeros_like(p.data)
+                    # Exponential moving average of squared gradient values for calculate grad sim
+                    state['exp_avg_sq_grad'] = torch.zeros_like(p.data)
                     # Maintains max of all exp. moving avg. of sq. grad. values
-                    param_state['max_exp_avg_sq'] = torch.zeros_like(p.data)
-                if not "ave_grad" in param_state:
-                    param_state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
-                if not "prev_grad" in param_state:
-                    param_state["prev_grad"] = torch.zeros_like(p.data)
+                    state['max_exp_avg_sq'] = torch.zeros_like(p.data)
+                    state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
+                    state["prev_grad"] = torch.zeros_like(p.data)
                 if p.grad is None: continue
                 
                 d_p = p.grad.data
-                cur_grad = d_p - param_state["prev_grad"]
+                cur_grad = d_p - state["prev_grad"]
+                
                 if self.hparams.adam_raw_grad:
-                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
+                  #param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
+                  state["ave_grad"][lan_id].mul_(scale_0).add_(self.scale_1*cur_grad)
                 else:
-                  denom = param_state['exp_avg_sq'].sqrt().add_(group['eps'])
-                  param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad / denom 
-                param_state["prev_grad"] = d_p.clone()
+                  exp_avg, exp_avg_sq = state['exp_avg_grad'], state['exp_avg_sq_grad']
+                  beta1, beta2 = group['betas']
+
+                  if group['weight_decay'] != 0:
+                      cur_grad.add_(group['weight_decay'], p.data)
+                  # Decay the first and second moment running average coefficient
+                  exp_avg.mul_(beta1).add_(1 - beta1, cur_grad)
+                  exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, cur_grad, cur_grad)
+                  denom = exp_avg_sq.sqrt().add_(group['eps'])
+
+                  bias_correction1 = 1 - beta1 ** (state['step']+1)
+                  bias_correction2 = 1 - beta2 ** (state['step']+1)
+                  step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+
+                  #p.data.addcdiv_(-step_size, exp_avg, denom)
+                  cur_grad.mul_(self.scale_1).mul_(step_size).div(denom)
+                  state["ave_grad"][lan_id].mul_(self.scale_0).add_(cur_grad) 
+                
+                state["prev_grad"] = d_p.clone()
     
     def get_cosine_sim(self):
         # return a list of cosine sim of base lan and the lan_id
@@ -97,10 +119,14 @@ class customAdam(Optimizer):
                 for i in range(self.hparams.lan_size):
                   prod = param_state["ave_grad"][i] * param_state["ave_grad"][base_lan_id]
                   prod = prod.sum()
-                  norm = param_state["ave_grad"][i].norm(2) ** 2
-                  cosine_prod[i] = cosine_prod[i] + prod  
-                  cosine_norm[i] = cosine_norm[i] + norm  
-        cosine_dist = [p / (n.sqrt()*cosine_norm[base_lan_id].sqrt() +1e-10) for p, n in zip(cosine_prod, cosine_norm)]
+                  cosine_prod[i] = cosine_prod[i] + prod
+                  if self.hparams.grad_dist == "cosine":
+                    norm = param_state["ave_grad"][i].norm(2) ** 2
+                    cosine_norm[i] = cosine_norm[i] + norm  
+        if self.hparams.grad_dist == "cosine":
+          cosine_dist = [p / (n.sqrt()*cosine_norm[base_lan_id].sqrt() +1e-10) for p, n in zip(cosine_prod, cosine_norm)]
+        elif self.hparams.grad_dist == "dot_prod":
+          cosine_dist = cosine_prod
         return cosine_dist
 
     def step(self, closure=None):
@@ -130,8 +156,17 @@ class customAdam(Optimizer):
                     state['step'] = 0
                     # Exponential moving average of gradient values
                     state['exp_avg'] = torch.zeros_like(p.data)
+                    # Exponential moving average of gradient values for calculate grad sim
+                    state['exp_avg_grad'] = torch.zeros_like(p.data)
                     # Exponential moving average of squared gradient values
                     state['exp_avg_sq'] = torch.zeros_like(p.data)
+                    # Exponential moving average of squared gradient values for calculate grad sim
+                    state['exp_avg_sq_grad'] = torch.zeros_like(p.data)
+                    # Maintains max of all exp. moving avg. of sq. grad. values
+                    state['max_exp_avg_sq'] = torch.zeros_like(p.data)
+                    state["ave_grad"] = [torch.zeros_like(p.data) for _ in range(self.hparams.lan_size)]
+                    state["prev_grad"] = torch.zeros_like(p.data)
+
                     if amsgrad:
                         # Maintains max of all exp. moving avg. of sq. grad. values
                         state['max_exp_avg_sq'] = torch.zeros_like(p.data)
