@@ -463,8 +463,14 @@ class RLDataUtil(object):
       for src_idx, p in enumerate(prob):
         if random.random() < p:
           self.lan_id.append(src_idx)
-          self.x_train.append(src_list[src_idx])
-          self.y_train.append(trg)
+          if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
+            self.x_train.append(src_list[src_idx][:self.hparams.max_len])
+          else:
+            self.x_train.append(src_list[src_idx])
+          if self.hparams.max_len and len(trg) > self.hparams.max_len:
+            self.y_train.append(trg[:self.hparams.max_len])
+          else:
+            self.y_train.append(trg)
       #prob = [float(repr(p)) for p in prob]
       #prob = np.array(prob) / sum(prob)
       #src_idx = np.random.choice(self.hparams.lan_size, p=prob)
