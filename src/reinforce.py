@@ -260,12 +260,13 @@ class ReinforceTrainer():
       a_logits.masked_fill_(mask, -float("inf"))
         
       loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
-      loss = (loss * grad_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
+      loss = (loss * grad_scale * self.hparams.reward_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
       cur_loss = loss.item()
       loss.backward()
       self.actor_optim.step()
       self.actor_optim.zero_grad()
-      print("eps={}, actor loss={}".format(eps, cur_loss))
+      if step % self.hparams.print_every == 0:
+        print("eps={}, actor loss={}".format(eps, cur_loss))
   
   def imitate_heuristic(self):
     data_batch, next_data_batch = [], []
