@@ -87,6 +87,23 @@ class HeuristicActor(nn.Module):
     bias_logit = self.bias.weight * existed_src * self.lan_dist_vec
     return bias_logit
 
+class InitActor(nn.Module):
+  def __init__(self, hparams, num_feature, lan_dist_vec):
+    super(InitActor, self).__init__()
+    self.hparams = hparams
+    hidden_size = hparams.d_hidden
+    lan_vector = [-100 for _ in range(self.hparams.lan_size)]
+    lan_vector[self.hparams.base_lan_id] = 1
+    self.lan_dist_vec = Variable(torch.FloatTensor(lan_vector))
+    if self.hparams.cuda:
+      self.lan_dist_vec = self.lan_dist_vec.cuda()
+
+  def forward(self, feature):
+    #(model_feature, language_feature, data_feature) = feature
+    feature, existed_src = feature
+
+    logit = existed_src * self.lan_dist_vec
+    return logit
 
 class EmbActor(nn.Module):
   def __init__(self, hparams, lan_dist_vec):
