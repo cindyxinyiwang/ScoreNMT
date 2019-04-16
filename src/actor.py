@@ -92,8 +92,8 @@ class InitActor(nn.Module):
     super(InitActor, self).__init__()
     self.hparams = hparams
     hidden_size = hparams.d_hidden
-    lan_vector = [-100 for _ in range(self.hparams.lan_size)]
-    lan_vector[self.hparams.base_lan_id] = 1
+    lan_vector = [0 for _ in range(self.hparams.lan_size)]
+    lan_vector[self.hparams.base_lan_id] = 100
     self.lan_dist_vec = Variable(torch.FloatTensor(lan_vector))
     if self.hparams.cuda:
       self.lan_dist_vec = self.lan_dist_vec.cuda()
