@@ -132,8 +132,13 @@ class ReinforceTrainer():
           print("actor not implemented")
           exit(0)
         if self.hparams.imitate_episode:
-          self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-        
+          if self.hparams.imitate_type == "heuristic":
+            self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+          elif self.hparams.imitate_type == "init":
+            self.heuristic_actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+          else:
+            print("actor not implemented")
+            exit(0)
         self.start_time = time.time()
         trainable_params = [
           p for p in self.nmt_model.parameters() if p.requires_grad]
