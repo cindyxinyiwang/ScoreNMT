@@ -82,7 +82,7 @@ class customAdam(Optimizer):
                 cur_grad = d_p - state["prev_grad"]
                 
                 if self.hparams.adam_raw_grad:
-                  #param_state["ave_grad"][lan_id] = self.scale_0*param_state["ave_grad"][lan_id] + self.scale_1*cur_grad
+                  #state["ave_grad"][lan_id] = self.scale_0*state["ave_grad"][lan_id] + self.scale_1*cur_grad
                   state["ave_grad"][lan_id].mul_(self.scale_0).add_(self.scale_1*cur_grad)
                 else:
                   exp_avg, exp_avg_sq = state['exp_avg_grad'], state['exp_avg_sq_grad']
