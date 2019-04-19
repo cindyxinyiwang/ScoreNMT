@@ -77,19 +77,26 @@ class RLDataUtil(object):
     trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
     self.data_raw_trg = []
     trg_lines = open(trg, 'r').readlines()
-    lan_src_counts = self.load_raw_data_list(src, trg, trg_lines)
-    print("language statistics: ")
-    print(lan_src_counts)
-    # batch the raw instances
-    self.raw_start_indices = []
-    self.raw_end_indices = []
-    start_index, end_index = 0, 0
-    while end_index < len(self.data_raw_trg):
-      end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
-      self.raw_start_indices.append(start_index)
-      self.raw_end_indices.append(end_index)
-      start_index = end_index
+    if self.hparams.bucketed:
+      lan_src_counts = self.load_raw_data_bucketed(src, trg, trg_lines)
+      print("language statistics: ")
+      print(lan_src_counts)
+    else:
+      lan_src_counts = self.load_raw_data_list(src, trg, trg_lines)
+      print("language statistics: ")
+      print(lan_src_counts)
+      # batch the raw instances
+      self.raw_start_indices = []
+      self.raw_end_indices = []
+      start_index, end_index = 0, 0
+      while end_index < len(self.data_raw_trg):
+        end_index = min(start_index + self.hparams.raw_batch_size, len(self.data_raw_trg))
+        self.raw_start_indices.append(start_index)
+        self.raw_end_indices.append(end_index)
+        start_index = end_index
     self.cur_line = 0
+    self.cur_bucket = 0
+    self.cur_bucket_line = 0
     
     # lan dist vec
     self.hparams.base_lan_id = self.lan_w2i[self.hparams.base_lan]
@@ -273,6 +280,58 @@ class RLDataUtil(object):
           cur_lan += 1
     return lan_src_counts
 
+  def load_raw_data_bucketed(self, src, trg, trg_lines):
+    lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
+    data_raw_trg = []
+    for trg_line in trg_lines:
+      toks = trg_line.split()
+      if self.hparams.max_len and len(toks) > self.hparams.max_len:
+        toks = toks[:self.hparams.max_len]
+      t_list = [self.hparams.bos_id]
+      for tok in toks:
+        if tok in self.trg_w2i:
+          t_list.append(self.trg_w2i[tok])
+        else:
+          t_list.append(self.hparams.unk_id)
+      t_list.append(self.hparams.eos_id)
+      data_raw_trg.append(t_list)
+    
+    cur_num, cur_lan = 0, 0
+    src_sents, src_exist = [], []
+    lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
+    self.data_raw = {}
+    with open(src, 'r') as src_file:
+      for s in src_file:
+        s = s.strip()
+        if s == "EOF":
+          bucket_key = tuple(src_exist)
+          if bucket_key not in self.data_raw:
+            self.data_raw[bucket_key] = []
+          src_len = [len(ss) for ss in src_sents]
+          self.data_raw[bucket_key].append([src_sents, data_raw_trg[cur_num], src_len])
+          src_sents, src_exist = [], []
+          
+          cur_num += 1
+          cur_lan = 0
+        else:
+          toks = s.split()
+          if self.hparams.max_len and len(toks) > self.hparams.max_len:
+            toks = toks[:self.hparams.max_len]
+          s_list = [self.hparams.bos_id]
+          for tok in toks:
+            if tok in self.src_w2i:
+              s_list.append(self.src_w2i[tok])
+            else:
+              s_list.append(self.hparams.unk_id)
+          if len(toks) > 0:
+            lan_src_counts[cur_lan] += 1
+          s_list.append(self.hparams.eos_id)
+          src_sents.append(s_list)
+          src_exist.append(len(s_list) > 2)
+          cur_lan += 1
+    self.data_raw_keys = list(self.data_raw.keys())
+    return lan_src_counts
+
 
   def get_lan_dist(self):
     self.lan_dists = [[-1 for _ in range(self.hparams.lan_size)] for _ in range(self.hparams.lan_size)]
@@ -357,7 +416,7 @@ class RLDataUtil(object):
  
 
   def next_base_data(self):
-    x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[self.hparams.base_lan_id], self.train_trg_file_list[self.hparams.base_lan_id], 0, outprint=True, load_full=True)
+    x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[self.hparams.base_lan_id], self.train_trg_file_list[self.hparams.base_lan_id], 0, outprint=False, load_full=True)
     start_indices, end_indices = [], []
     if self.hparams.batcher == "word":
       start_index, end_index, count = 0, 0, 0
@@ -444,7 +503,80 @@ class RLDataUtil(object):
         if self.hparams.cuda:
           prob = prob.cuda()
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, prob, batch_size, eop
- 
+   
+  def load_nmt_train_actor_bucketed(self, featurizer, actor):
+     x, y = [], []
+     lan_selected_times = [0 for _ in range(self.hparams.lan_size)]
+     
+     if self.hparams.batcher == "word":
+       start_index, end_index, count = 0, 0, 0
+       while True:
+         src_list, trg, src_len = self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_line]
+         s = featurizer.get_state([src_list], [src_len], [trg])
+         a_logits = actor(s)
+         mask = 1 - s[1].byte()
+         a_logits.masked_fill_(mask, -float("inf"))
+         a, prob = sample_action(a_logits, temp=1., log=False)
+         if self.cur_bucket_line % 1000 == 0:
+           print(prob)
+         x_tmp, y_tmp, selected_idx = [], [], []
+         for src_idx, p in enumerate(prob):
+           if random.random() < p:
+             if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
+               x_tmp.append(src_list[src_idx][:self.hparams.max_len])
+             else:
+               x_tmp.append(src_list[src_idx])
+             if self.hparams.max_len and len(trg) > self.hparams.max_len:
+               y_tmp.append(trg[:self.hparams.max_len])
+             else:
+               y_tmp.append(trg)
+             count += (len(x_tmp[-1]) + len(y_tmp[-1]))
+             selected_idx.append(src_idx)
+         if count > self.hparams.batch_size:
+           break
+         else:
+           self.cur_bucket_line += 1
+           x.extend(x_tmp)
+           y.extend(y_tmp)
+           for idx in selected_idx:
+             lan_selected_times[idx] += 1
+
+         if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
+           self.cur_bucket_line = 0
+           self.cur_bucket += 1
+         if self.cur_bucket >= len(self.data_raw_keys):
+           self.cur_bucket = 0
+           self.cur_bucket_line = 0
+     elif self.hparams.batcher == "sent":
+       print("unknown batcher")
+       exit(1)
+     else:
+       print("unknown batcher")
+       exit(1)
+     return x, y, [src_list], [src_len], [trg], lan_selected_times
+   
+  def next_sample_nmt_train_bucketed(self, featurizer, actor):
+    step = 0
+    while True:
+      step += 1
+      x, y, x_raw, x_raw_len, y_raw, lan_selected_times = self.load_nmt_train_actor_bucketed(featurizer, actor)
+      batch_size = len(x)
+      if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
+        self.cur_bucket_line = 0
+        self.cur_bucket += 1
+      if self.cur_bucket >= len(self.data_raw_keys):
+        self.cur_bucket = 0
+        self.cur_bucket_line = 0
+      if step % 500 == 0:
+        print(lan_selected_times)
+      if self.shuffle:
+        (x, y), _ = self.sort_by_xlen([x, y])
+      # pad
+      x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
+      y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
+      eop = (self.cur_bucket==0 and self.cur_bucket_line==0) 
+      yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop
+
   def load_nmt_train_actor(self, start_index, num, featurizer, actor):
     end_index = min(start_index + num, len(self.data_raw_trg))
     print(start_index, end_index)
@@ -581,8 +713,17 @@ class RLDataUtil(object):
         #eop = (self.cur_line == 0 and step_b == len(batch_indices)-1)
         eop = (step_b == len(batch_indices)-1)
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop
+ 
+  def next_raw_example_bucketed(self):
+    while True:
+      for data_key, data_item in self.data_raw.items():
+        for item_idx, item in enumerate(data_item[:1]):
+          src, trg, src_len = item
+          eop = (data_key==self.data_raw_keys[-1] and item_idx == 0)
+          #print(data_key, self.data_raw_keys[-1])
+          yield [src], [src_len], [trg], -1, eop
 
-  def next_raw_example(self):
+  def next_raw_example_normal(self):
     max_step = self.hparams.agent_subsample_line/self.hparams.raw_batch_size
     while True:
       if self.hparams.decode:
@@ -596,6 +737,13 @@ class RLDataUtil(object):
         src_len = self.data_src_len[start_idx:end_idx]
         eop = (step_b == len(batch_indices)-1)
         yield src, src_len, trg, (step_b % max_step) / max_step, eop
+
+  def next_raw_example(self):
+    while True:
+      if self.hparams.bucketed:
+        yield self.next_raw_example_bucketed()
+      else:
+        yield self.next_raw_example_normal()
 
   def next_score_decode(self):
     #src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
@@ -864,8 +1012,6 @@ class RLDataUtil(object):
       print("src_unk={}, trg_unk={}".format(src_unk_count, trg_unk_count))
       print("lines={}, skipped_lines={}".format(len(trg_data), skip_line_count))
     return src_data, trg_data, src_char_kv_data, src_lens, src_word_rank
-
-
 
   def _get_char(self, word, i2w, w2i, n=1):
     chars = []
