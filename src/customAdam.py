@@ -50,6 +50,95 @@ class customAdam(Optimizer):
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
+    def save_train_grad(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                state = self.state[p]
+                if len(state) == 0:
+                    state['step'] = 0
+                    # Exponential moving average of gradient values
+                    state['exp_avg'] = torch.zeros_like(p.data)
+                    # Exponential moving average of gradient values for calculate grad sim
+                    state['exp_avg_grad'] = torch.zeros_like(p.data)
+                    # Exponential moving average of squared gradient values
+                    state['exp_avg_sq'] = torch.zeros_like(p.data)
+                    # Exponential moving average of squared gradient values for calculate grad sim
+                    state['exp_avg_sq_grad'] = torch.zeros_like(p.data)
+                    # Maintains max of all exp. moving avg. of sq. grad. values
+                    state['max_exp_avg_sq'] = torch.zeros_like(p.data)
+                state['train_grad'] = torch.zeros_like(p.data)
+                if p.grad is None: continue
+                grad = p.grad.data
+
+                if self.hparams.adam_raw_grad:
+                  #state["ave_grad"][lan_id] = self.scale_0*state["ave_grad"][lan_id] + self.scale_1*cur_grad
+                  state["train_grad"].add_(grad)
+                else:
+                  exp_avg, exp_avg_sq = state['exp_avg_grad'], state['exp_avg_sq_grad']
+                  beta1, beta2 = group['betas']
+
+                  if group['weight_decay'] != 0:
+                      cur_grad.add_(group['weight_decay'], p.data)
+                  # Decay the first and second moment running average coefficient
+                  exp_avg.mul_(beta1).add_(1 - beta1, grad)
+                  exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                  denom = exp_avg_sq.sqrt().add_(group['eps'])
+
+                  bias_correction1 = 1 - beta1 ** (state['step']+1)
+                  bias_correction2 = 1 - beta2 ** (state['step']+1)
+                  step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+
+                  #p.data.addcdiv_(-step_size, exp_avg, denom)
+                  state["train_grad"].add_(grad).mul_(step_size).div(denom)
+        self.reset_grad()
+
+    def get_cosine_sim_bucketed(self):
+        # return a list of cosine sim of base lan and the lan_id
+        cosine_prod = 0
+        cosine_norm = 0
+        base_lan_id = self.hparams.base_lan_id
+        for group in self.param_groups:
+            for p in group["params"]:
+                state = self.state[p]
+                if not "train_grad" in state:
+                    state["train_grad"] = torch.zeros_like(p.data)
+                if p.grad is None: continue
+                # find current grad
+                grad = p.grad.data
+
+                if not self.hparams.adam_raw_grad:
+                  exp_avg, exp_avg_sq = state['exp_avg_grad'], state['exp_avg_sq_grad']
+                  beta1, beta2 = group['betas']
+                  if group['weight_decay'] != 0:
+                      cur_grad.add_(group['weight_decay'], p.data)
+                  # Decay the first and second moment running average coefficient
+                  exp_avg.mul_(beta1).add_(1 - beta1, grad)
+                  exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                  denom = exp_avg_sq.sqrt().add_(group['eps'])
+
+                  bias_correction1 = 1 - beta1 ** (state['step']+1)
+                  bias_correction2 = 1 - beta2 ** (state['step']+1)
+                  step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+
+                  #p.data.addcdiv_(-step_size, exp_avg, denom)
+                  grad.mul_(step_size).div(denom)
+                
+                cosine_prod += (state["train_grad"] * grad).sum()
+                cosine_norm += state["train_grad"].norm(2) ** 2
+        if self.hparams.grad_dist == "cosine":
+          cosine_dist = cosine_prod / (cosine_norm.sqrt()+1e-10)
+        elif self.hparams.grad_dist == "dot_prod":
+          cosine_dist = cosine_prod
+        self.reset_grad()
+        return cosine_dist
+
+    def reset_grad(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                state = self.state[p]
+                state["exp_avg_grad"] = state["exp_avg"].clone()
+                state["exp_avg_sq_grad"] = state["exp_avg_sq"].clone()
+ 
     def zero_prev_grad(self):
         for group in self.param_groups:
             for p in group["params"]:
