@@ -310,7 +310,6 @@ class RLDataUtil(object):
           src_len = [len(ss) for ss in src_sents]
           self.data_raw[bucket_key].append([src_sents, data_raw_trg[cur_num], src_len])
           src_sents, src_exist = [], []
-          
           cur_num += 1
           cur_lan = 0
         else:
@@ -561,6 +560,7 @@ class RLDataUtil(object):
          if self.cur_bucket >= len(self.data_raw_keys):
            self.cur_bucket = 0
            self.cur_bucket_line = 0
+           break
      elif self.hparams.batcher == "sent":
        print("unknown batcher")
        exit(1)
@@ -588,7 +588,7 @@ class RLDataUtil(object):
       # pad
       x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
       y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-      eop = (self.cur_bucket==0 and self.cur_bucket_line==0) 
+      eop = (self.cur_bucket==0 and self.cur_bucket_line==0)
       yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop
 
   def load_nmt_train_actor(self, start_index, num, featurizer, actor):
