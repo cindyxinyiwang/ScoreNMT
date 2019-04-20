@@ -552,7 +552,8 @@ class ReinforceTrainer():
       cur_nmt_loss = cur_nmt_loss.div_(batch_size * hparams.update_batch)
      
       cur_nmt_loss.backward()
-      optim.save_train_grad()
+      if not self.hparams.not_train_score:
+        optim.save_train_grad()
       grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), hparams.clip_grad)
 
       mask = (labels == hparams.pad_id)
@@ -567,7 +568,8 @@ class ReinforceTrainer():
         if self.hparams.cosine_schedule_max_step:
           self.scheduler.step()
 
-      self.train_score_bucketed(x_raw, x_raw_len, y_raw, lan_selected_times)
+      if not self.hparams.not_train_score:
+        self.train_score_bucketed(x_raw, x_raw_len, y_raw, lan_selected_times)
       # clean up GPU memory
       if self.step % hparams.clean_mem_every == 0:
         gc.collect()
