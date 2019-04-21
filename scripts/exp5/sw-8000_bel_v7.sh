@@ -12,7 +12,7 @@ DDIR=/home/xinyiw/multv-nmt/
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_exp5/sw-8000_bel_v1/" \
+  --output_dir="outputs_exp5/sw-8000_bel_v7/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/bel_eng/ted-dev.mtok.spm8000.bel \
@@ -47,7 +47,7 @@ python3.6 src/rl_main.py \
   --data_name="tiny" \
   --d_hidden 32 \
   --adam_raw_grad=0 \
-  --reward_scale=0.01 \
+  --reward_scale=1 \
   --grad_dist="cosine" \
   --cuda \
   --imitate_episode 1 \
@@ -56,6 +56,6 @@ python3.6 src/rl_main.py \
   --feature_type="zero_one" \
   --add_bias=0 \
   --bucketed \
-  --scale_0 0. \
-  --scale_1 1. \
+  --scale_0 0.5 \
+  --scale_1 1.0 \
   --seed 0
