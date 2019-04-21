@@ -479,25 +479,23 @@ class ReinforceTrainer():
       if eob: break
  
   def train_score_bucketed(self, src, src_len, trg, lan_selected_times):
-    step = 0
     # update the actor with graidents scaled by cosine similarity
     # first update on the base language
     for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_base_data():
-      logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
+      logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=self.step, x_rank=[])
       logits = logits.view(-1, self.hparams.trg_vocab_size)
       labels = y_train[:,1:].contiguous().view(-1)
       cur_nmt_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=self.hparams.pad_id, reduction="none")
       cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
       # save the gradients to nmt moving average
       cur_nmt_loss.backward()
-      grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
+      self.nmt_optim.save_dev_grad()
       break
 
     grad_reward = self.nmt_optim.get_cosine_sim_bucketed()
     self.nmt_optim.zero_grad()
     #print(grad_scale.data)
     s = self.featurizer.get_state(src, src_len, trg)
-    step += 1
     mask = 1 - s[1].byte()
     a_logits = self.actor([s[0], s[1]])
     a_logits.masked_fill_(mask, -float("inf"))
@@ -507,6 +505,8 @@ class ReinforceTrainer():
     if self.hparams.cuda:
       lan_selected_times = lan_selected_times.cuda()
     # find the number of being selected for each language
+    if self.step % self.hparams.print_every == 0:
+      print("grad_cosine={}".format(grad_reward.item()))
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).masked_fill_(mask, 0.).sum() 
     loss.backward()
     self.actor_optim.step()

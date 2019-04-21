@@ -5,9 +5,9 @@
 #SBATCH -t 0
 
 export PYTHONPATH="$(pwd)"
-export CUDA_VISIBLE_DEVICES="3"
+export CUDA_VISIBLE_DEVICES="0"
 
-DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+DDIR=/home/xinyiw/multv-nmt/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
@@ -39,8 +39,7 @@ python3.6 src/rl_main.py \
   --raw_batch_size 1 \
   --lr_dec 1.0 \
   --lr 0.001 \
-  --lr_q 0.0001 \
-  --refresh_base_grad=0 \
+  --lr_q 0.001 \
   --n_train_epochs=20 \
   --dropout 0.3 \
   --max_len 380 \
@@ -57,4 +56,6 @@ python3.6 src/rl_main.py \
   --feature_type="zero_one" \
   --add_bias=0 \
   --bucketed \
+  --scale_0 0. \
+  --scale_1 1. \
   --seed 0
