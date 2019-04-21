@@ -54,7 +54,10 @@ class Actor(nn.Module):
     feature, existed_src = feature
     batch_size = feature.size(0)
 
-    enc = self.w(feature)
+    if self.hparams.norm_feature:
+      enc = self.w(feature / feature.sum(dim=-1))
+    else:
+      enc = self.w(feature)
     enc = torch.relu(enc)
     enc = self.w2(enc)
     enc = torch.relu(enc)

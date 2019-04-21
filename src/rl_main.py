@@ -254,6 +254,7 @@ parser.add_argument("--reward_scale", type=float, default=1, help="scale of the 
 parser.add_argument("--imitate_type", type=str, default="heuristic", help="[heuristic|init]")
 
 parser.add_argument("--bucketed", action="store_true", help="whether to use bucketed version of RL")
+parser.add_argument("--norm_feature", action="store_true", help="whether to normalize the feature for actor")
 args = parser.parse_args()
 
 def train():
