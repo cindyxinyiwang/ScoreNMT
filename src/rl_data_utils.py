@@ -557,8 +557,8 @@ class RLDataUtil(object):
          if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
            self.cur_bucket_line = 0
            self.cur_bucket += 1
-          if self.cur_bucket < len(self.data_raw_keys):
-            random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
+           if self.cur_bucket < len(self.data_raw_keys):
+             random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
          if self.cur_bucket >= len(self.data_raw_keys):
            self.cur_bucket = 0
            self.cur_bucket_line = 0
