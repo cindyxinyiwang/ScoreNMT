@@ -519,32 +519,34 @@ class RLDataUtil(object):
          if self.cur_bucket_line % 1000 == 0:
            print(prob)
          x_tmp, y_tmp, selected_idx = [], [], []
-         prob = np.array([float(repr(p)) for p in prob])
-         prob = prob / sum(prob)
-         src_idx = np.random.choice(self.hparams.lan_size, p=prob)
-         if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
-           x_tmp.append(src_list[src_idx][:self.hparams.max_len])
+         if self.hparams.sample_all:
+           for src_idx, p in enumerate(prob):
+             if random.random() < p:
+               if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
+                 x_tmp.append(src_list[src_idx][:self.hparams.max_len])
+               else:
+                 x_tmp.append(src_list[src_idx])
+               if self.hparams.max_len and len(trg) > self.hparams.max_len:
+                 y_tmp.append(trg[:self.hparams.max_len])
+               else:
+                 y_tmp.append(trg)
+               count += (len(x_tmp[-1]) + len(y_tmp[-1]))
+               selected_idx.append(src_idx)
          else:
-           x_tmp.append(src_list[src_idx])
-         if self.hparams.max_len and len(trg) > self.hparams.max_len:
-           y_tmp.append(trg[:self.hparams.max_len])
-         else:
-           y_tmp.append(trg)
-         count += (len(x_tmp[-1]) + len(y_tmp[-1]))
-         selected_idx.append(src_idx)
+           prob = np.array([float(repr(p)) for p in prob])
+           prob = prob / sum(prob)
+           src_idx = np.random.choice(self.hparams.lan_size, p=prob)
+           if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
+             x_tmp.append(src_list[src_idx][:self.hparams.max_len])
+           else:
+             x_tmp.append(src_list[src_idx])
+           if self.hparams.max_len and len(trg) > self.hparams.max_len:
+             y_tmp.append(trg[:self.hparams.max_len])
+           else:
+             y_tmp.append(trg)
+           count += (len(x_tmp[-1]) + len(y_tmp[-1]))
+           selected_idx.append(src_idx)
 
-         #for src_idx, p in enumerate(prob):
-         #  if random.random() < p:
-         #    if self.hparams.max_len and len(src_list[src_idx]) > self.hparams.max_len:
-         #      x_tmp.append(src_list[src_idx][:self.hparams.max_len])
-         #    else:
-         #      x_tmp.append(src_list[src_idx])
-         #    if self.hparams.max_len and len(trg) > self.hparams.max_len:
-         #      y_tmp.append(trg[:self.hparams.max_len])
-         #    else:
-         #      y_tmp.append(trg)
-         #    count += (len(x_tmp[-1]) + len(y_tmp[-1]))
-         #    selected_idx.append(src_idx)
          if count > self.hparams.batch_size:
            break
          else:
@@ -562,7 +564,9 @@ class RLDataUtil(object):
          if self.cur_bucket >= len(self.data_raw_keys):
            self.cur_bucket = 0
            self.cur_bucket_line = 0
-           break
+           random.shuffle(self.data_raw_keys)
+           if count > 0:
+             break
      elif self.hparams.batcher == "sent":
        print("unknown batcher")
        exit(1)
@@ -585,6 +589,7 @@ class RLDataUtil(object):
       if self.cur_bucket >= len(self.data_raw_keys):
         self.cur_bucket = 0
         self.cur_bucket_line = 0
+        random.shuffle(self.data_raw_keys)
       if step % 500 == 0:
         print(lan_selected_times)
       if self.shuffle:

@@ -255,6 +255,7 @@ parser.add_argument("--imitate_type", type=str, default="heuristic", help="[heur
 
 parser.add_argument("--bucketed", action="store_true", help="whether to use bucketed version of RL")
 parser.add_argument("--norm_feature", action="store_true", help="whether to normalize the feature for actor")
+parser.add_argument("--sample_all", action="store_true", help="whether to sample all languages for a given target")
 args = parser.parse_args()
 
 def train():
