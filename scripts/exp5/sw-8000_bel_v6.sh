@@ -7,7 +7,7 @@
 export PYTHONPATH="$(pwd)"
 export CUDA_VISIBLE_DEVICES="0"
 
-DDIR=/home/xinyiw/multv-nmt/
+DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
@@ -46,16 +46,16 @@ python3.6 src/rl_main.py \
   --print_every 50 \
   --data_name="tiny" \
   --d_hidden 32 \
-  --adam_raw_grad=0 \
   --reward_scale=1 \
-  --grad_dist="cosine" \
+  --grad_dist="dot_prod" \
   --cuda \
-  --imitate_episode 1 \
+  --imitate_episode 10 \
   --imitate_type="init" \
   --actor_type="base" \
   --feature_type="zero_one" \
+  --norm_feature \
   --add_bias=0 \
   --bucketed \
-  --scale_0 0.05 \
-  --scale_1 0.95 \
+  --scale_0 0. \
+  --scale_1 1. \
   --seed 0

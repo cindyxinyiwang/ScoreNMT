@@ -256,6 +256,10 @@ parser.add_argument("--imitate_type", type=str, default="heuristic", help="[heur
 parser.add_argument("--bucketed", action="store_true", help="whether to use bucketed version of RL")
 parser.add_argument("--norm_feature", action="store_true", help="whether to normalize the feature for actor")
 parser.add_argument("--sample_all", action="store_true", help="whether to sample all languages for a given target")
+
+parser.add_argument("--baseline", action="store_true", help="whether to use baseline for grad prod")
+parser.add_argument("--baseline_scale_0", type=float, default=0.2, help="weight for prev grad prod")
+parser.add_argument("--baseline_scale_1", type=float, default=0.8, help="weight for current grad prod")
 args = parser.parse_args()
 
 def train():
