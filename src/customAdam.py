@@ -33,6 +33,9 @@ class customAdam(Optimizer):
         self.scale_0, self.scale_1 = torch.FloatTensor([self.hparams.scale_0]), torch.FloatTensor([self.hparams.scale_1])
         if self.hparams.cuda: 
           self.scale_0, self.scale_1 = self.scale_0.cuda(), self.scale_1.cuda()
+        self.baseline = 0
+        self.cur_step = 0
+        
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -96,16 +99,15 @@ class customAdam(Optimizer):
           cosine_dist = cosine_prod / (cosine_norm.sqrt()+1e-10)
         elif self.hparams.grad_dist == "dot_prod":
           cosine_dist = cosine_prod
-        self.reset_grad()
-        return cosine_dist
+        self.cur_step += 1
+        if self.hparams.baseline:
+          if self.cur_step >= 100:
+            ret = cosine_dist - self.baseline
+          else:
+            ret = cosine_dist
+          self.baseline = self.baseline * self.hparams.baseline_scale_0 + cosine_dist * self.hparams.baseline_scale_1
+        return ret
 
-    def reset_grad(self):
-        for group in self.param_groups:
-            for p in group["params"]:
-                state = self.state[p]
-                state["exp_avg_grad"] = state["exp_avg"].clone()
-                state["exp_avg_sq_grad"] = state["exp_avg_sq"].clone()
- 
     def step_bucketed(self, closure=None):
         """Performs a single optimization step.
 
