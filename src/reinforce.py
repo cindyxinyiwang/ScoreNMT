@@ -131,6 +131,13 @@ class ReinforceTrainer():
         else:
           print("actor not implemented")
           exit(0)
+
+        trainable_params = [
+          p for p in self.actor.parameters() if p.requires_grad]
+        num_params = count_params(trainable_params)
+        print("Actor Model has {0} params".format(num_params))
+        self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
+
         if self.hparams.imitate_episode:
           if self.hparams.imitate_type == "heuristic":
             self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
@@ -139,6 +146,9 @@ class ReinforceTrainer():
           else:
             print("actor not implemented")
             exit(0)
+        elif self.hparams.not_train_score:
+          self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+
         self.start_time = time.time()
         trainable_params = [
           p for p in self.nmt_model.parameters() if p.requires_grad]
@@ -154,13 +164,6 @@ class ReinforceTrainer():
         
         if self.hparams.cosine_schedule_max_step:
           self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
-
-        trainable_params = [
-          p for p in self.actor.parameters() if p.requires_grad]
-        num_params = count_params(trainable_params)
-        print("Actor Model has {0} params".format(num_params))
-        self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
-
         if self.hparams.cuda:
           self.nmt_model = self.nmt_model.cuda()
           self.actor = self.actor.cuda()
@@ -552,8 +555,6 @@ class ReinforceTrainer():
       cur_nmt_loss = cur_nmt_loss.div_(batch_size * hparams.update_batch)
      
       cur_nmt_loss.backward()
-      if not self.hparams.not_train_score:
-        optim.save_train_grad()
       grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), hparams.clip_grad)
 
       mask = (labels == hparams.pad_id)
@@ -562,7 +563,7 @@ class ReinforceTrainer():
       total_corrects += cur_tr_acc.item()
 
       if self.step % hparams.update_batch == 0:
-        optim.step()
+        optim.step_bucketed()
         optim.zero_grad()
         update_batch_size = 0
         if self.hparams.cosine_schedule_max_step:
