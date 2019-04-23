@@ -46,14 +46,14 @@ python3.6 src/rl_main.py \
   --print_every 50 \
   --data_name="tiny" \
   --d_hidden 32 \
-  --adam_raw_grad=0 \
   --reward_scale=0.01 \
-  --grad_dist="cosine" \
+  --grad_dist="dot_prod" \
   --cuda \
-  --imitate_episode 1 \
+  --imitate_episode 10 \
   --imitate_type="init" \
   --actor_type="base" \
   --feature_type="zero_one" \
+  --norm_feature \
   --add_bias=0 \
   --bucketed \
   --scale_0 0. \
