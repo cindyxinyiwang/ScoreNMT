@@ -106,6 +106,8 @@ class customAdam(Optimizer):
           else:
             ret = cosine_dist
           self.baseline = self.baseline * self.hparams.baseline_scale_0 + cosine_dist * self.hparams.baseline_scale_1
+        else:
+          ret = cosine_dist
         return ret
 
     def step_bucketed(self, closure=None):
