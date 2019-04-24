@@ -529,9 +529,6 @@ class ReinforceTrainer():
       print("grad_cosine={}".format(grad_reward.item()))
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
-      bucket_instance_count = torch.FloatTensor(bucket_instance_count)
-      if self.hparams.cuda:
-        bucket_instance_count = bucket_instance_count.cuda()
       loss.div_(bucket_instance_count)
     if self.hparams.lrl_loss:
       loss = loss + lrl_loss * self.hparams.lrl_loss
