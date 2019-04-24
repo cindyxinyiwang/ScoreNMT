@@ -481,7 +481,7 @@ class ReinforceTrainer():
         if self.step > hparams.n_train_steps: break
       if eob: break
  
-  def train_score_bucketed(self, src, src_len, trg, lan_selected_times):
+  def train_score_bucketed(self, src, src_len, trg, lan_selected_times, bucket_instance_count):
     # update the actor with graidents scaled by cosine similarity
     # first update on the base language
     for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_base_data():
@@ -501,7 +501,15 @@ class ReinforceTrainer():
     s = self.featurizer.get_state(src, src_len, trg)
     mask = 1 - s[1].byte()
     a_logits = self.actor([s[0], s[1]])
-    a_logits.masked_fill_(mask, -float("inf"))
+    if self.hparams.lrl_loss:
+      lrl_vec = [self.hparams.base_lan_id]
+      lrl_label = torch.LongTensor(lrl_vec)
+      if self.hparams.cuda:
+        lrl_label = lrl_label.cuda()
+      lrl_loss = torch.nn.functional.cross_entropy(a_logits, lrl_label).sum()
+    else:
+      if self.hparams.mask_loss:
+        a_logits.masked_fill_(mask, -float("inf"))
  
     if self.hparams.reverse_sign:
       loss = torch.nn.functional.log_softmax(a_logits, dim=-1)
@@ -513,7 +521,14 @@ class ReinforceTrainer():
     # find the number of being selected for each language
     if self.step % self.hparams.print_every == 0:
       print("grad_cosine={}".format(grad_reward.item()))
-    loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).masked_fill_(mask, 0.).sum() 
+    loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
+    if self.hparams.norm_bucket_count:
+      bucket_instance_count = torch.FloatTensor(bucket_instance_count)
+      if self.hparams.cuda:
+        bucket_instance_count = bucket_instance_count.cuda()
+      loss.div_(bucket_instance_count)
+    if self.hparams.lrl_loss:
+      loss = loss + lrl_loss * self.hparams.lrl_loss
     loss.backward()
     self.actor_optim.step()
     self.actor_optim.zero_grad()
@@ -546,7 +561,7 @@ class ReinforceTrainer():
     #epoch = 0
     update_batch_size = 0
     #for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in data_util.next_nmt_train():
-    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, self.actor):
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, self.actor):
       self.step += 1
       target_words += (y_count - batch_size)
       logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=self.step, x_rank=[])
@@ -573,7 +588,7 @@ class ReinforceTrainer():
           self.scheduler.step()
 
       if not self.hparams.not_train_score:
-        self.train_score_bucketed(x_raw, x_raw_len, y_raw, lan_selected_times)
+        self.train_score_bucketed(x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count)
       # clean up GPU memory
       if self.step % hparams.clean_mem_every == 0:
         gc.collect()
