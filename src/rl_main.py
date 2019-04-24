@@ -260,6 +260,8 @@ parser.add_argument("--sample_all", action="store_true", help="whether to sample
 parser.add_argument("--baseline", action="store_true", help="whether to use baseline for grad prod")
 parser.add_argument("--baseline_scale_0", type=float, default=0.2, help="weight for prev grad prod")
 parser.add_argument("--baseline_scale_1", type=float, default=0.8, help="weight for current grad prod")
+
+parser.add_argument("--reverse_sign", action="store_true", help="whether to reverse the sign")
 args = parser.parse_args()
 
 def train():

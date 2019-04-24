@@ -502,8 +502,11 @@ class ReinforceTrainer():
     mask = 1 - s[1].byte()
     a_logits = self.actor([s[0], s[1]])
     a_logits.masked_fill_(mask, -float("inf"))
-        
-    loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
+ 
+    if self.hparams.reverse_sign:
+      loss = torch.nn.functional.log_softmax(a_logits, dim=-1)
+    else:
+      loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
     lan_selected_times = Variable(torch.FloatTensor(lan_selected_times).view(1, -1))
     if self.hparams.cuda:
       lan_selected_times = lan_selected_times.cuda()
