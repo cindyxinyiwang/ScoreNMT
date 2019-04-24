@@ -262,6 +262,10 @@ parser.add_argument("--baseline_scale_0", type=float, default=0.2, help="weight 
 parser.add_argument("--baseline_scale_1", type=float, default=0.8, help="weight for current grad prod")
 
 parser.add_argument("--reverse_sign", action="store_true", help="whether to reverse the sign")
+
+parser.add_argument("--lrl_loss", type=float, default=0., help="weight for lrl loss")
+parser.add_argument("--mask_loss", type=int, default=1, help="whether to reverse the sign")
+parser.add_argument("--norm_bucket_instance", action="store_true", help="whether to reverse the sign")
 args = parser.parse_args()
 
 def train():

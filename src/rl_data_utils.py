@@ -300,6 +300,7 @@ class RLDataUtil(object):
     src_sents, src_exist = [], []
     lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
     self.data_raw = {}
+    self.data_raw_bucket_instance_count = {}
     with open(src, 'r') as src_file:
       for s in src_file:
         s = s.strip()
@@ -309,6 +310,9 @@ class RLDataUtil(object):
             self.data_raw[bucket_key] = []
           src_len = [len(ss) for ss in src_sents]
           self.data_raw[bucket_key].append([src_sents, data_raw_trg[cur_num], src_len])
+          if bucket_key not in self.data_raw_bucket_instance_count:
+            self.data_raw_bucket_instance_count[bucket_key] = 0
+          self.data_raw_bucket_instance_count[bucket_key] += 1
           src_sents, src_exist = [], []
           cur_num += 1
           cur_lan = 0
@@ -519,6 +523,7 @@ class RLDataUtil(object):
          if self.cur_bucket_line % 1000 == 0:
            print(prob)
          x_tmp, y_tmp, selected_idx = [], [], []
+         bucket_instance_count = self.data_raw_bucket_instance_count[self.data_raw_keys[self.cur_bucket]]
          if self.hparams.sample_all:
            for src_idx, p in enumerate(prob):
              if random.random() < p:
@@ -573,13 +578,13 @@ class RLDataUtil(object):
      else:
        print("unknown batcher")
        exit(1)
-     return x, y, [src_list], [src_len], [trg], lan_selected_times
+     return x, y, [src_list], [src_len], [trg], lan_selected_times, bucket_instance_count
    
   def next_sample_nmt_train_bucketed(self, featurizer, actor):
     step = 0
     while True:
       step += 1
-      x, y, x_raw, x_raw_len, y_raw, lan_selected_times = self.load_nmt_train_actor_bucketed(featurizer, actor)
+      x, y, x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count = self.load_nmt_train_actor_bucketed(featurizer, actor)
       batch_size = len(x)
       if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
         self.cur_bucket_line = 0
@@ -598,7 +603,7 @@ class RLDataUtil(object):
       x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
       y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
       eop = (self.cur_bucket==0 and self.cur_bucket_line==0)
-      yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop
+      yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count
 
   def load_nmt_train_actor(self, start_index, num, featurizer, actor):
     end_index = min(start_index + num, len(self.data_raw_trg))
