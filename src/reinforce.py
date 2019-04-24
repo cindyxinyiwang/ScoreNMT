@@ -147,7 +147,13 @@ class ReinforceTrainer():
             print("actor not implemented")
             exit(0)
         elif self.hparams.not_train_score:
-          self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+          if self.hparams.imitate_type == "heuristic":
+            self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+          elif self.hparams.imitate_type == "init":
+            self.actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+          else:
+            print("actor not implemented")
+            exit(0)
 
         self.start_time = time.time()
         trainable_params = [
@@ -522,7 +528,7 @@ class ReinforceTrainer():
     if self.step % self.hparams.print_every == 0:
       print("grad_cosine={}".format(grad_reward.item()))
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
-    if self.hparams.norm_bucket_count:
+    if self.hparams.norm_bucket_instance:
       bucket_instance_count = torch.FloatTensor(bucket_instance_count)
       if self.hparams.cuda:
         bucket_instance_count = bucket_instance_count.cuda()
