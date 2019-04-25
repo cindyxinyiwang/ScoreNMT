@@ -99,7 +99,8 @@ class customAdam(Optimizer):
                 if p.grad is None: continue
                 grad = p.grad.data
                 
-                if self.hparams.adam_raw_grad:
+                #if self.hparams.adam_raw_grad:
+                if True:
                   state["dev_grad"].mul_(self.scale_0).add_(grad *self.scale_1)
                 else:
                   # clone so that we don't modify the grads
@@ -205,7 +206,8 @@ class customAdam(Optimizer):
                 if self.hparams.adam_raw_grad:
                   state["train_grad"].mul_(self.scale_0).add_(grad*self.scale_1)
                 else:
-                  state["train_grad"].mul_(self.scale_0).add_(grad*step_size*self.scale_1/denom)
+                  #state["train_grad"].mul_(self.scale_0).add_(grad*step_size*self.scale_1/denom)
+                  state["train_grad"].mul_(self.scale_0).add_(exp_avg*step_size*self.scale_1/denom)
         return loss
 
     def zero_prev_grad(self):
