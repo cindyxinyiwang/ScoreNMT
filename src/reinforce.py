@@ -498,7 +498,7 @@ class ReinforceTrainer():
       cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
       # save the gradients to nmt moving average
       cur_nmt_loss.backward()
-      self.nmt_optim.save_dev_grad()
+      #self.nmt_optim.save_dev_grad()
       break
 
     grad_reward = self.nmt_optim.get_cosine_sim_bucketed()
