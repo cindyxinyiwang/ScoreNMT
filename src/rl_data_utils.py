@@ -578,7 +578,7 @@ class RLDataUtil(object):
      else:
        print("unknown batcher")
        exit(1)
-     return x, y, [src_list], [src_len], [trg], lan_selected_times, bucket_instance_count
+     return x, y, [src_list], [src_len], [trg], lan_selected_times, bucket_instance_count / len(x)
    
   def next_sample_nmt_train_bucketed(self, featurizer, actor):
     step = 0
