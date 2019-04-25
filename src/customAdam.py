@@ -30,9 +30,10 @@ class customAdam(Optimizer):
     def __init__(self, params, hparams, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=0, amsgrad=False):
         self.hparams = hparams
-        self.scale_0, self.scale_1 = torch.FloatTensor([self.hparams.scale_0]), torch.FloatTensor([self.hparams.scale_1])
-        if self.hparams.cuda: 
-          self.scale_0, self.scale_1 = self.scale_0.cuda(), self.scale_1.cuda()
+        self.scale_0, self.scale_1 = self.hparams.scale_0, self.hparams.scale_1
+        #self.scale_0, self.scale_1 = torch.FloatTensor([self.hparams.scale_0]), torch.FloatTensor([self.hparams.scale_1])
+        #if self.hparams.cuda: 
+        #  self.scale_0, self.scale_1 = self.scale_0.cuda(), self.scale_1.cuda()
         self.baseline = 0
         self.cur_step = 0
         
@@ -63,28 +64,32 @@ class customAdam(Optimizer):
                 if p.grad is None: continue
                 grad = p.grad.data
                 
-                # clone so that we don't modify the grads
-                exp_avg, exp_avg_sq = state['exp_avg'].clone(), state['exp_avg_sq'].clone()
-                beta1, beta2 = group['betas']
+                if self.hparams.adam_raw_grad:
+                  state["dev_grad"].mul_(self.scale_0).add_(grad *self.scale_1)
+                else:
+                  # clone so that we don't modify the grads
+                  exp_avg, exp_avg_sq = state['exp_avg'].clone(), state['exp_avg_sq'].clone()
+                  beta1, beta2 = group['betas']
 
-                if group['weight_decay'] != 0:
-                    grad.add_(group['weight_decay'], p.data)
-                # Decay the first and second moment running average coefficient
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                  if group['weight_decay'] != 0:
+                      grad.add_(group['weight_decay'], p.data)
+                  # Decay the first and second moment running average coefficient
+                  exp_avg.mul_(beta1).add_(1 - beta1, grad)
+                  exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
 
-                denom = exp_avg_sq.sqrt().add_(group['eps'])
-                bias_correction1 = 1 - beta1 ** (state['step']+1)
-                bias_correction2 = 1 - beta2 ** (state['step']+1)
-                step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+                  denom = exp_avg_sq.sqrt().add_(group['eps'])
+                  bias_correction1 = 1 - beta1 ** (state['step']+1)
+                  bias_correction2 = 1 - beta2 ** (state['step']+1)
+                  step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
-                exp_avg.mul_(step_size).mul_(self.scale_1).div_(denom)
-                state["dev_grad"].mul_(self.scale_0).add_(exp_avg)
+                  grad.mul_(step_size).mul_(self.scale_1).div_(denom)
+                  state["dev_grad"].mul_(self.scale_0).add_(grad)
 
     def get_cosine_sim_bucketed(self):
         # return a list of cosine sim of base lan and the lan_id
         cosine_prod = 0
-        cosine_norm = 0
+        cosine_norm_train = 0
+        cosine_norm_dev = 0
         base_lan_id = self.hparams.base_lan_id
         for group in self.param_groups:
             for p in group["params"]:
@@ -93,10 +98,10 @@ class customAdam(Optimizer):
                     state["train_grad"] = torch.zeros_like(p.data)
                 if p.grad is None: continue
                 cosine_prod += (state["train_grad"] * state["dev_grad"]).sum()
-                cosine_norm += state["train_grad"].norm(2) ** 2
-                cosine_norm += state["dev_grad"].norm(2) ** 2
+                cosine_norm_train += state["train_grad"].norm(2) ** 2
+                cosine_norm_dev += state["dev_grad"].norm(2) ** 2
         if self.hparams.grad_dist == "cosine":
-          cosine_dist = cosine_prod / (cosine_norm.sqrt()+1e-10)
+          cosine_dist = cosine_prod / (cosine_norm_dev.sqrt() * cosine_norm_train.sqrt()+1e-10)
         elif self.hparams.grad_dist == "dot_prod":
           cosine_dist = cosine_prod
         self.cur_step += 1
@@ -173,8 +178,11 @@ class customAdam(Optimizer):
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
                 p.data.addcdiv_(-step_size, exp_avg, denom)
-
-                state["train_grad"].mul_(self.scale_0).add_(exp_avg*step_size*self.scale_1/denom)
+                
+                if self.hparams.adam_raw_grad:
+                  state["train_grad"].mul_(self.scale_0).add_(grad*self.scale_1)
+                else:
+                  state["train_grad"].mul_(self.scale_0).add_(grad*step_size*self.scale_1/denom)
         return loss
 
     def zero_prev_grad(self):
