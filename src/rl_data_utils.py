@@ -521,7 +521,7 @@ class RLDataUtil(object):
          a_logits.masked_fill_(mask, -float("inf"))
          a, prob = sample_action(a_logits, temp=1., log=False)
          if self.cur_bucket_line % 1000 == 0:
-           print(prob)
+           print("lan_probs="+str(prob))
          x_tmp, y_tmp, selected_idx = [], [], []
          bucket_instance_count = self.data_raw_bucket_instance_count[self.data_raw_keys[self.cur_bucket]]
          if self.hparams.sample_all:
@@ -595,8 +595,8 @@ class RLDataUtil(object):
         self.cur_bucket = 0
         self.cur_bucket_line = 0
         random.shuffle(self.data_raw_keys)
-      if step % 500 == 0:
-        print(lan_selected_times)
+      if step % self.hparams.print_every == 0:
+        print("lan_selected_times="+str(lan_selected_times))
       if self.shuffle:
         (x, y), _ = self.sort_by_xlen([x, y])
       # pad
@@ -617,9 +617,9 @@ class RLDataUtil(object):
       mask = 1 - s[1].byte()
       a_logits.masked_fill_(mask, -float("inf"))
       a, prob = sample_action(a_logits, temp=1., log=False)
-      if idx % 500 == 0:
-        print(s[1])
-        print(prob)
+      if idx % self.hparams.print_every == 0:
+        #print(s[1])
+        print("lan_probs="+str(prob))
       for src_idx, p in enumerate(prob):
         if random.random() < p:
           self.lan_id.append(src_idx)
@@ -765,36 +765,6 @@ class RLDataUtil(object):
         src_len = self.data_src_len[start_idx:end_idx]
         eop = (step_b == len(batch_indices)-1)
         yield src, src_len, trg, (step_b % max_step) / max_step, eop
-
-  def next_raw_example(self):
-    while True:
-      if self.hparams.bucketed:
-        yield self.next_raw_example_bucketed()
-      else:
-        yield self.next_raw_example_normal()
-
-  def next_score_decode(self):
-    #src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
-    #trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
-    #trg_lines = open(trg, 'r').readlines()
-    #lan_src_counts = self.load_rl_decode(src, trg, trg_lines)
-    #print("language statistics: ")
-    #print(lan_src_counts)
-    batch_indices = [i for i in range(len(self.data_raw_trg))]
-    while True:
-      for step_b, batch_idx in enumerate(batch_indices):
-        src_list, trg = self.data_raw_src[batch_idx], self.data_raw_trg[batch_idx]
-        trg_list = [trg for _ in range(len(src_list))]
-        src_len = self.data_src_len[batch_idx]
-
-        if self.shuffle:
-          (x, y), index = self.sort_by_xlen([src_list, trg_list])
-        # pad
-        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
-        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-        batch_size = len(x)
-        eop = (step_b == len(batch_indices)-1)
-        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, eop, index
 
   def prepare_batch(self, data_batch):
     x = [d[0] for d in data_batch]

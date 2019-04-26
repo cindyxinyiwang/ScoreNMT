@@ -89,6 +89,7 @@ parser.add_argument("--trg_vocab_list", type=str, default=None, help="target voc
 parser.add_argument("--test_src_file_list", type=str, default=None, help="source test file")
 parser.add_argument("--test_src_file", type=str, default=None, help="source test file")
 parser.add_argument("--test_trg_file_list", type=str, default=None, help="target test file")
+parser.add_argument("--test_ref_file_list", type=str, default=None, help="target test file")
 parser.add_argument("--test_file_idx_list", type=str, default=None, help="target valid file for reference")
 parser.add_argument("--test_trg_file", type=str, default=None, help="target test file")
 parser.add_argument("--src_char_vocab_from", type=str, default=None, help="source char vocab file")
@@ -601,5 +602,42 @@ def main():
     sys.stdout = Logger(log_file)
     train()
 
+  # translate dev test
+  trans_script = 'python3.6 src/translate.py \
+  --model_file="{}/ppl_final_nmt_model.pt" \
+  --hparams_file="{}/ppl_final_nmt_hparams.pt" \
+  --test_src_file_list  {} \
+  --test_trg_file_list  {} \
+  --test_ref_file_list  {} \
+  --test_file_idx_list "0" \
+  --cuda \
+  --merge_bpe \
+  --beam_size=5 \
+  --poly_norm_m=1 \
+  --max_len=200 \
+  --trans_dev \
+  --log_file="{}/ppl_trans_log" \
+  --out_prefix="ppl" \
+  --out_file="{}/ppl-ted-test-b5m1"'.format(args.output_dir, args.output_dir, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, args.output_dir, args.output_dir)
+  out = subprocess.getoutput(trans_script)
+  print(out)
+  trans_script = 'python3.6 src/translate.py \
+  --model_file="{}/bleu_final_nmt_model.pt" \
+  --hparams_file="{}/bleu_final_nmt_hparams.pt" \
+  --test_src_file_list  {} \
+  --test_trg_file_list  {} \
+  --test_ref_file_list  {} \
+  --test_file_idx_list "0" \
+  --cuda \
+  --merge_bpe \
+  --beam_size=5 \
+  --poly_norm_m=1 \
+  --max_len=200 \
+  --trans_dev \
+  --log_file="{}/bleu_trans_log" \
+  --out_prefix="bleu" \
+  --out_file="{}/bleu-ted-test-b5m1"'.format(args.output_dir, args.output_dir, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, args.output_dir, args.output_dir)
+  out = subprocess.getoutput(trans_script)
+  print(out)
 if __name__ == "__main__":
   main()

@@ -92,127 +92,85 @@ class ReinforceTrainer():
     self.hparams = hparams
     self.data_loader = RLDataUtil(hparams)
 
-    if self.hparams.decode:
-      print("Decoding...")
-      self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "nmt.pt")) 
-      self.nmt_crit = get_criterion(hparams)
+    print("Training RL...")
+    if self.hparams.load_model:
+      self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_model.pt")) 
+      self.nmt_optim = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_optim.pt")) 
       self.actor = torch.load(os.path.join(self.hparams.output_dir, "actor.pt"))
-      trainable_params = [
-        p for p in self.nmt_model.parameters() if p.requires_grad]
-      num_params = count_params(trainable_params)
-      print("NMT Model has {0} params".format(num_params))
-      self.nmt_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
-      self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
-      self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
+      self.actor_optim = torch.load(os.path.join(self.hparams.output_dir, "actor_optim.pt"))
+      if self.hparams.actor_type == "base":
+        self.featurizer = Featurizer(hparams, self.data_loader)
+      elif self.hparams.actor_type == "emb":
+        self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
+      self.start_time = time.time()
+      [self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch] = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_extras.pt"))
+      if self.hparams.cuda:
+       self.nmt_model = self.nmt_model.cuda()
+       self.actor = self.actor.cuda()
     else:
-      print("Training RL...")
-      if self.hparams.load_model:
-        self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_model.pt")) 
-        self.nmt_optim = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_optim.pt")) 
-        self.actor = torch.load(os.path.join(self.hparams.output_dir, "actor.pt"))
-        self.actor_optim = torch.load(os.path.join(self.hparams.output_dir, "actor_optim.pt"))
-        if self.hparams.actor_type == "base":
-          self.featurizer = Featurizer(hparams, self.data_loader)
-        elif self.hparams.actor_type == "emb":
-          self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
-        self.start_time = time.time()
-        [self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch] = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_extras.pt"))
-        if self.hparams.cuda:
-         self.nmt_model = self.nmt_model.cuda()
-         self.actor = self.actor.cuda()
+      self.nmt_model = Seq2Seq(hparams, self.data_loader)
+      if self.hparams.actor_type == "base":
+        self.featurizer = Featurizer(hparams, self.data_loader)
+        self.actor = Actor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+      elif self.hparams.actor_type == "emb":
+        self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
+        self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
       else:
-        self.nmt_model = Seq2Seq(hparams, self.data_loader)
-        if self.hparams.actor_type == "base":
-          self.featurizer = Featurizer(hparams, self.data_loader)
-          self.actor = Actor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-        elif self.hparams.actor_type == "emb":
-          self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
-          self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
+        print("actor not implemented")
+        exit(0)
+
+      trainable_params = [
+        p for p in self.actor.parameters() if p.requires_grad]
+      num_params = count_params(trainable_params)
+      print("Actor Model has {0} params".format(num_params))
+      self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
+
+      if self.hparams.imitate_episode:
+        if self.hparams.imitate_type == "heuristic":
+          self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        elif self.hparams.imitate_type == "init":
+          self.heuristic_actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        else:
+          print("actor not implemented")
+          exit(0)
+      elif self.hparams.not_train_score:
+        if self.hparams.imitate_type == "heuristic":
+          self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        elif self.hparams.imitate_type == "init":
+          self.actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         else:
           print("actor not implemented")
           exit(0)
 
-        trainable_params = [
-          p for p in self.actor.parameters() if p.requires_grad]
-        num_params = count_params(trainable_params)
-        print("Actor Model has {0} params".format(num_params))
-        self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
+      self.start_time = time.time()
+      trainable_params = [
+        p for p in self.nmt_model.parameters() if p.requires_grad]
+      num_params = count_params(trainable_params)
+      print("NMT Model has {0} params".format(num_params))
+      if self.hparams.model_optimizer == "SGD":
+        self.nmt_optim = customSGD(trainable_params, hparams, lr=self.hparams.lr)
+      elif self.hparams.model_optimizer == "ADAM":
+        self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
+      else:
+        print("optimizer not defined")
+        exit(0)
+      
+      if self.hparams.cosine_schedule_max_step:
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
+      if self.hparams.cuda:
+        self.nmt_model = self.nmt_model.cuda()
+        self.actor = self.actor.cuda()
 
-        if self.hparams.imitate_episode:
-          if self.hparams.imitate_type == "heuristic":
-            self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-          elif self.hparams.imitate_type == "init":
-            self.heuristic_actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-          else:
-            print("actor not implemented")
-            exit(0)
-        elif self.hparams.not_train_score:
-          if self.hparams.imitate_type == "heuristic":
-            self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-          elif self.hparams.imitate_type == "init":
-            self.actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
-          else:
-            print("actor not implemented")
-            exit(0)
-
-        self.start_time = time.time()
-        trainable_params = [
-          p for p in self.nmt_model.parameters() if p.requires_grad]
-        num_params = count_params(trainable_params)
-        print("NMT Model has {0} params".format(num_params))
-        if self.hparams.model_optimizer == "SGD":
-          self.nmt_optim = customSGD(trainable_params, hparams, lr=self.hparams.lr)
-        elif self.hparams.model_optimizer == "ADAM":
-          self.nmt_optim = customAdam(trainable_params, hparams, lr=self.hparams.lr, weight_decay=self.hparams.l2_reg)
-        else:
-          print("optimizer not defined")
-          exit(0)
-        
-        if self.hparams.cosine_schedule_max_step:
-          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.nmt_optim, self.hparams.cosine_schedule_max_step)
-        if self.hparams.cuda:
-          self.nmt_model = self.nmt_model.cuda()
-          self.actor = self.actor.cuda()
-
-        if hparams.init_type == "uniform" and not hparams.model_type == "transformer":
-          print("initialize uniform with range {}".format(hparams.init_range))
-          for p in self.nmt_model.parameters():
-            p.data.uniform_(-hparams.init_range, hparams.init_range)
-        self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
-        self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
-        self.step = 0
-        self.cur_attempt = 0
-        self.lr = self.hparams.lr
-        self.epoch = 0
-
-  def decode(self, output_file):
-    max_step = 15
-    train_step = 0
-    step = 0
-    output = output_file
-    output = open(output, 'w')
-    data_batch, next_data_batch = [], []
-    batch_count = 0
-    hparams = copy.deepcopy(self.hparams)
-    hparams.decode = True
-    data_util = RLDataUtil(hparams)
-    #for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example():
-    for src, src_len, trg, iter_percent, eop in data_util.next_raw_example():
-      #print(src, src_len, trg, iter_percent, eop)
-      step += 1
-      s = self.featurizer.get_state(src, src_len, trg)
-      a_logits = self.actor(s)
-      mask = 1 - s[1].byte()
-      a_logits.masked_fill_(mask, -float("inf"))
-
-      a, prob = sample_action(a_logits, temp=self.hparams.max_temp, log=False)
-      batch_size = len(src)
-      prob_f = [repr(i) for i in prob]
-
-      for _ in range(batch_size):
-        output.write(" ".join(prob_f) + "\n")
-
-      if eop: break  
+      if hparams.init_type == "uniform" and not hparams.model_type == "transformer":
+        print("initialize uniform with range {}".format(hparams.init_range))
+        for p in self.nmt_model.parameters():
+          p.data.uniform_(-hparams.init_range, hparams.init_range)
+      self.best_val_ppl = [None for _ in range(len(hparams.dev_src_file_list))]
+      self.best_val_bleu = [None for _ in range(len(hparams.dev_src_file_list))]
+      self.step = 0
+      self.cur_attempt = 0
+      self.lr = self.hparams.lr
+      self.epoch = 0
    
   def train_score(self):
     step = 0
@@ -498,12 +456,14 @@ class ReinforceTrainer():
       cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
       # save the gradients to nmt moving average
       cur_nmt_loss.backward()
-      #self.nmt_optim.save_dev_grad()
       break
 
-    grad_reward = self.nmt_optim.get_cosine_sim_bucketed()
+    grad_cosine, grad_prod = self.nmt_optim.get_cosine_sim_bucketed()
+    if self.hparams.grad_dist == "cosine":
+      grad_reward = grad_cosine
+    elif self.hparams.grad_dist == "dot_prod":
+      grad_reward = grad_prod
     self.nmt_optim.zero_grad()
-    #print(grad_scale.data)
     s = self.featurizer.get_state(src, src_len, trg)
     mask = 1 - s[1].byte()
     a_logits = self.actor([s[0], s[1]])
@@ -526,7 +486,8 @@ class ReinforceTrainer():
       lan_selected_times = lan_selected_times.cuda()
     # find the number of being selected for each language
     if self.step % self.hparams.print_every == 0:
-      print("grad_cosine={}".format(grad_reward.item()))
+      print("grad_prod={}".format(grad_prod.item()))
+      print("grad_cosine={}".format(grad_cosine.item()))
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
       loss.div_(bucket_instance_count)
@@ -538,7 +499,6 @@ class ReinforceTrainer():
 
   def train_nmt_full_bucketed(self):
     hparams = copy.deepcopy(self.hparams)
-
     hparams.train_nmt = True
 
     model = self.nmt_model 
@@ -636,27 +596,34 @@ class ReinforceTrainer():
         with torch.no_grad():
           val_ppl, val_bleu, ppl_list, bleu_list = eval(model, self.data_loader, self.step, hparams, hparams, eval_bleu=based_on_bleu, valid_batch_size=hparams.valid_batch_size, tr_logits=logits)	
         for i in range(len(ppl_list)):
+          save_bleu, save_ppl = False, False
           if based_on_bleu:
             if self.best_val_bleu[i] is None or self.best_val_bleu[i] <= bleu_list[i]:
-              save = True 
+              save_bleu = True 
               self.best_val_bleu[i] = bleu_list[i]
               self.cur_attempt = 0
             else:
-              save = False
+              save_bleu = False
               self.cur_attempt += 1
           else:
             if self.best_val_ppl[i] is None or self.best_val_ppl[i] >= ppl_list[i]:
-              save = True
+              save_ppl = True
               self.best_val_ppl[i] = ppl_list[i]
               self.cur_attempt = 0 
             else:
-              save = False
+              save_ppl = False
               self.cur_attempt += 1
-          if save:
-            if len(ppl_list) > 1:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim)
-            else:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim)
+          if save_bleu or save_ppl:
+            if save_bleu:
+              if len(ppl_list) > 1:
+                nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim, prefix="bleu_")
+              else:
+                nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim, prefix="bleu_")
+            if save_ppl:
+             if len(ppl_list) > 1:
+               nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim, prefix="ppl_")
+             else:
+               nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim, prefix="ppl_")
           elif not hparams.lr_schedule and self.step >= hparams.n_warm_ups:
             self.lr = self.lr * hparams.lr_dec
             set_lr(optim, self.lr)
@@ -697,4 +664,3 @@ class ReinforceTrainer():
         pass
       else:
         self.train_score()
-

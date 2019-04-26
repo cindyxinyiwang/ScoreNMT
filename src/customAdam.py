@@ -124,20 +124,9 @@ class customAdam(Optimizer):
                 cosine_prod += (state["train_grad"] * state["dev_grad"]).sum()
                 cosine_norm_train += state["train_grad"].norm(2) ** 2
                 cosine_norm_dev += state["dev_grad"].norm(2) ** 2
-        if self.hparams.grad_dist == "cosine":
-          cosine_dist = cosine_prod / (cosine_norm_dev.sqrt() * cosine_norm_train.sqrt()+1e-10)
-        elif self.hparams.grad_dist == "dot_prod":
-          cosine_dist = cosine_prod
+        cosine_dist = cosine_prod / (cosine_norm_dev.sqrt() * cosine_norm_train.sqrt()+1e-10)
         self.cur_step += 1
-        if self.hparams.baseline:
-          if self.cur_step >= 100:
-            ret = cosine_dist - self.baseline
-          else:
-            ret = cosine_dist
-          self.baseline = self.baseline * self.hparams.baseline_scale_0 + cosine_dist * self.hparams.baseline_scale_1
-        else:
-          ret = cosine_dist
-        return ret
+        return cosine_dist, cosine_prod
 
     def step_bucketed(self, closure=None):
         """Performs a single optimization step.
