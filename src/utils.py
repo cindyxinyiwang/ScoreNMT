@@ -91,14 +91,14 @@ def agent_save_checkpoint(agent, hparams, path, agent_name):
   torch.save(agent, os.path.join(path, agent_name))
   torch.save(hparams, os.path.join(path, "hparams.pt"))
 
-def nmt_save_checkpoint(extras, model, optim, hparams, path, actor, actor_optim):
+def nmt_save_checkpoint(extras, model, optim, hparams, path, actor, actor_optim, prefix=""):
   print("Saving model to '{0}'".format(path))
-  torch.save(model, os.path.join(path, "final_nmt_model.pt"))
-  torch.save(hparams, os.path.join(path, "final_nmt_hparams.pt"))
-  torch.save(extras, os.path.join(path, "final_nmt_extras.pt"))
-  torch.save(optim, os.path.join(path, "final_nmt_optim.pt"))
-  torch.save(actor, os.path.join(path, "actor.pt"))
-  torch.save(actor_optim, os.path.join(path, "actor_optim.pt"))
+  torch.save(model, os.path.join(path, prefix+"final_nmt_model.pt"))
+  torch.save(hparams, os.path.join(path, prefix+"final_nmt_hparams.pt"))
+  torch.save(extras, os.path.join(path, prefix+"final_nmt_extras.pt"))
+  torch.save(optim, os.path.join(path, prefix+"final_nmt_optim.pt"))
+  torch.save(actor, os.path.join(path, prefix+"actor.pt"))
+  torch.save(actor_optim, os.path.join(path, prefix+"actor_optim.pt"))
   #torch.save(actor, os.path.join(path, actor_name))
 
 
