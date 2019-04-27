@@ -333,6 +333,9 @@ class RLDataUtil(object):
           src_exist.append(len(s_list) > 2)
           cur_lan += 1
     self.data_raw_keys = list(self.data_raw.keys())
+    # sort by y for each bucket
+    #for key in self.data_raw_keys:
+    #  self.data_raw[key].sort(key = lambda x:len(x[1]))
     return lan_src_counts
 
 

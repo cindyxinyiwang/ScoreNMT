@@ -11,7 +11,6 @@ import numpy as np
 from utils import *
 from model import *
 from rl_data_utils import RLDataUtil 
-from state_data import *
 from featurizer import *
 from actor import *
 from customAdam import *
@@ -608,14 +607,13 @@ class ReinforceTrainer():
             else:
               save_bleu = False
               self.cur_attempt += 1
+          if self.best_val_ppl[i] is None or self.best_val_ppl[i] >= ppl_list[i]:
+            save_ppl = True
+            self.best_val_ppl[i] = ppl_list[i]
+            self.cur_attempt = 0 
           else:
-            if self.best_val_ppl[i] is None or self.best_val_ppl[i] >= ppl_list[i]:
-              save_ppl = True
-              self.best_val_ppl[i] = ppl_list[i]
-              self.cur_attempt = 0 
-            else:
-              save_ppl = False
-              self.cur_attempt += 1
+            save_ppl = False
+            self.cur_attempt += 1
           if save_bleu or save_ppl:
             if save_bleu:
               if len(ppl_list) > 1:

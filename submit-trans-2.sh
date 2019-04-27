@@ -13,7 +13,7 @@ set -e
 export PYTHONPATH="$(pwd)"                                                       
 export CUDA_VISIBLE_DEVICES="2" 
 
-version=exp4
+version=exp5
 mkdir -p outputs_"$version"
 for f in `ls scripts/"$version"/*_trans.sh`; do
   f1=`basename $f .sh`
