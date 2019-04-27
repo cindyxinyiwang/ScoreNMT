@@ -12,7 +12,7 @@ DDIR=/home/xinyiw/multv-nmt/
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_exp6/sw-8000_bel_v12/" \
+  --output_dir="outputs_exp6/sw-8000_bel_v12_sorted/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/bel_eng/ted-dev.mtok.spm8000.bel \
@@ -42,7 +42,7 @@ python3.6 src/rl_main.py \
   --lr_q 0.0001 \
   --n_train_epochs=20 \
   --dropout 0.3 \
-  --max_len 380 \
+  --max_len 180 \
   --print_every 50 \
   --data_name="tiny" \
   --d_hidden 32 \

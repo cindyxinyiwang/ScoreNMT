@@ -11,7 +11,6 @@ import numpy as np
 from utils import *
 from model import *
 from rl_data_utils import RLDataUtil 
-from state_data import *
 
 from collections import defaultdict, deque
 import copy
