@@ -5,14 +5,14 @@
 #SBATCH -t 0
 
 export PYTHONPATH="$(pwd)"
-export CUDA_VISIBLE_DEVICES="2"
+export CUDA_VISIBLE_DEVICES="0"
 
 DDIR=/home/xinyiw/multv-nmt/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_exp7/sw-8000_bel_v1/" \
+  --output_dir="outputs_exp7/sw-8000_bel_v2/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/bel_eng/ted-dev.mtok.spm8000.bel \
@@ -46,12 +46,18 @@ python3.6 src/rl_main.py \
   --print_every 50 \
   --data_name="tiny" \
   --d_hidden 32 \
+  --reward_scale=1 \
+  --grad_dist="cosine" \
   --cuda \
-  --imitate_episode 20 \
-  --imitate_type "heuristic" \
+  --imitate_episode 10 \
+  --imitate_type="init" \
   --actor_type="base" \
   --feature_type="zero_one" \
+  --norm_feature \
+  --norm_bucket_instance \
+  --adam_raw_grad=1 \
   --add_bias=0 \
-  --not_train_score \
   --bucketed \
+  --scale_0 0.1 \
+  --scale_1 0.9 \
   --seed 0
