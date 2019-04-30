@@ -524,7 +524,7 @@ class RLDataUtilUnsort(object):
        start_index, end_index, count, max_len = 0, 0, 0, 0
        bucket_change, sampled_idx = True, 0
        while True:
-         src_list, trg, src_len = self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_list_idx][self.cur_bucket_line]
+         src_list, trg, src_len = self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_line]
          if bucket_change:
            s = featurizer.get_state([src_list], [src_len], [trg])
            a_logits = actor(s)
@@ -754,7 +754,7 @@ class RLDataUtilUnsort(object):
   def next_raw_example_bucketed(self):
     while True:
       for data_key, data_item in self.data_raw.items():
-        for item_idx, item in enumerate(data_item[0][:1]):
+        for item_idx, item in enumerate(data_item[:1]):
           src, trg, src_len = item
           eop = (data_key==self.data_raw_keys[-1] and item_idx == 0)
           #print(data_key, self.data_raw_keys[-1])
