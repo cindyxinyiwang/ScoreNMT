@@ -589,11 +589,11 @@ class RLDataUtilUnsort(object):
        exit(1)
      return x, y, [src_list], [src_len], [trg], lan_selected_times, bucket_instance_count / len(x)
    
-  def next_sample_nmt_train_bucketed(self, featurizer, actor):
+  def next_sample_nmt_train_bucketed(self, featurizer):
     step = 0
     while True:
       step += 1
-      x, y, x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count = self.load_nmt_train_actor_bucketed(featurizer, actor)
+      x, y, x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count = self.load_nmt_train_actor_bucketed(featurizer, self.actor)
       batch_size = len(x)
       if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
         self.cur_bucket_line = 0
