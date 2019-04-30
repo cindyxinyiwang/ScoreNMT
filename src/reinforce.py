@@ -110,6 +110,10 @@ class ReinforceTrainer():
       self.nmt_model = Seq2Seq(hparams, self.data_loader)
       if self.hparams.pretrained_actor:
         self.actor = torch.load(self.hparams.pretrained_actor)
+        if self.hparams.actor_type == "base":
+          self.featurizer = Featurizer(hparams, self.data_loader)
+        elif self.hparams.actor_type == "emb":
+          self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
       else:
         if self.hparams.actor_type == "base":
           self.featurizer = Featurizer(hparams, self.data_loader)
@@ -135,7 +139,7 @@ class ReinforceTrainer():
         else:
           print("actor not implemented")
           exit(0)
-      elif self.hparams.not_train_score:
+      elif self.hparams.not_train_score and not self.hparams.pretrained_actor:
         if self.hparams.imitate_type == "heuristic":
           self.actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         elif self.hparams.imitate_type == "init":
