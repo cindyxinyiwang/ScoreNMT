@@ -426,11 +426,11 @@ class RLDataUtilUnsort(object):
       start_index, end_index, count = 0, 0, 0
       max_len, sent = 0, 0
       while True:
-        #count += (len(x_train[end_index])+ len(y_train[end_index]))
-        max_len = max(max_len, len(x_train[end_index]))
-        max_len = max(max_len, len(y_train[end_index]))
-        sent += 1
-        count = 2*sent*max_len
+        count += (len(x_train[end_index])+ len(y_train[end_index]))
+        #max_len = max(max_len, len(x_train[end_index]))
+        #max_len = max(max_len, len(y_train[end_index]))
+        #sent += 1
+        #count = 2*sent*max_len
         end_index += 1
         if end_index >= len(x_train):
           start_indices.append(start_index)
@@ -538,8 +538,8 @@ class RLDataUtilUnsort(object):
            #src_idx_list = torch.distributions.Categorical(prob).sample_n(40).data
            bucket_change, sampled_idx = False, 0
 
-           if self.cur_bucket_line % 1000 == 0:
-             print("lan_probs="+str(prob))
+         if self.cur_bucket_line % 1000 == 0:
+           print("lan_probs="+str(prob))
 
          x_tmp, y_tmp, selected_idx = [], [], []
          bucket_instance_count = self.data_raw_bucket_instance_count[self.data_raw_keys[self.cur_bucket]]
@@ -598,7 +598,7 @@ class RLDataUtilUnsort(object):
       if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
         self.cur_bucket_line = 0
         self.cur_bucket += 1
-        if self.hparams.shuffle_bucket and self.cur_bucket < len(self.data_raw_keys):
+        if self.cur_bucket < len(self.data_raw_keys):
           random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
       if self.cur_bucket >= len(self.data_raw_keys):
         self.cur_bucket = 0
