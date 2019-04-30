@@ -582,10 +582,10 @@ class ReinforceTrainer():
     #epoch = 0
     update_batch_size = 0
     if self.hparams.epsilon_max:
-      actor = self.actor
+      self.data_loader.actor = self.heuristic_actor
     else:
-      actor = self.heuristic_actor
-    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, actor):
+      self.data_loader.actor = self.actor
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer):
       self.step += 1
       if self.hparams.epsilon_max:
         if self.step < self.hparams.epsilon_anneal:
@@ -593,9 +593,9 @@ class ReinforceTrainer():
         else:
           epsilon = self.hparams.epsilon_min
         if random.random() < epsilon:
-          actor = self.heuristic_actor
+          self.data_loader.actor = self.heuristic_actor
         else:
-          actor = self.actor
+          self.data_loader.actor = self.actor
       target_words += (y_count - batch_size)
       logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=self.step, x_rank=[])
       logits = logits.view(-1, hparams.trg_vocab_size)
