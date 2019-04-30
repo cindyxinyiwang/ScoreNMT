@@ -135,7 +135,7 @@ class ReinforceTrainer():
       print("Actor Model has {0} params".format(num_params))
       self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
 
-      if self.hparams.imitate_episode:
+      if self.hparams.imitate_episode or self.hparams.epsilon_max:
         if self.hparams.imitate_type == "heuristic":
           self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         elif self.hparams.imitate_type == "init":
@@ -578,9 +578,21 @@ class ReinforceTrainer():
     #i = 0
     #epoch = 0
     update_batch_size = 0
-    #for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in data_util.next_nmt_train():
-    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, self.actor):
+    if self.hparams.epsilon_max:
+      actor = self.actor
+    else:
+      actor = self.heuristic_actor
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, actor):
       self.step += 1
+      if self.hparams.epsilon_max:
+        if self.step < self.hparams.epsilon_anneal:
+          epsilon = self.hparams.epsilon_max - self.step / self.hparams.epsilon_anneal * (self.hparams.epsilon_max-self.hparams.epsilon_min)
+        else:
+          epsilon = self.hparams.epsilon_min
+        if random.random() < self.epsilon_max:
+          actor = self.heuristic_actor
+        else:
+          actor = self.actor
       target_words += (y_count - batch_size)
       logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=self.step, x_rank=[])
       logits = logits.view(-1, hparams.trg_vocab_size)
