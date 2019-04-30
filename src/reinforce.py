@@ -181,6 +181,7 @@ class ReinforceTrainer():
       self.cur_attempt = 0
       self.lr = self.hparams.lr
       self.epoch = 0
+      self.baseline = 0
    
   def train_score(self):
     step = 0
@@ -550,6 +551,9 @@ class ReinforceTrainer():
     if self.step % self.hparams.print_every == 0:
       print("grad_prod={}".format(grad_prod.item()))
       print("grad_cosine={}".format(grad_cosine.item()))
+    if self.hparams.baseline:
+      grad_reward = grad_reward - self.baseline
+      self.baseline = self.baseline_scale_0 * self.baseline + self.baseline_scale_1 * grad_reward
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
       bucket_instance_count = torch.FloatTensor(bucket_instance_count)
