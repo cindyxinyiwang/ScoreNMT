@@ -268,6 +268,7 @@ parser.add_argument("--lrl_loss", type=float, default=0., help="weight for lrl l
 parser.add_argument("--mask_loss", type=int, default=1, help="whether to reverse the sign")
 parser.add_argument("--norm_bucket_instance", action="store_true", help="whether to reverse the sign")
 parser.add_argument("--shuffle_bucket", type=int, default=1, help="whether to shuffle data in each bucket")
+parser.add_argument("--pretrained_actor", type=str, default=1, help="whether to shuffle data in each bucket")
 args = parser.parse_args()
 
 def train():
