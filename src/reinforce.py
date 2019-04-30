@@ -592,7 +592,7 @@ class ReinforceTrainer():
           epsilon = self.hparams.epsilon_max - self.step / self.hparams.epsilon_anneal * (self.hparams.epsilon_max-self.hparams.epsilon_min)
         else:
           epsilon = self.hparams.epsilon_min
-        if random.random() < self.epsilon_max:
+        if random.random() < epsilon:
           actor = self.heuristic_actor
         else:
           actor = self.actor
