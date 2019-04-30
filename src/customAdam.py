@@ -85,6 +85,46 @@ class customAdam(Optimizer):
                   grad.mul_(step_size).mul_(self.scale_1).div_(denom)
                   state["dev_grad"].mul_(self.scale_0).add_(grad)
 
+    def get_cosine_sim_all(self):
+        # return a list of cosine sim of base lan and the lan_id
+        cosine_prod = 0
+        cosine_norm_train = 0
+        cosine_norm_dev = 0
+        base_lan_id = self.hparams.base_lan_id
+        for group in self.param_groups:
+            for p in group["params"]:
+                state = self.state[p]
+                if p.grad is None: continue
+                grad = p.grad.data
+                
+                if self.hparams.adam_raw_grad:
+                  grad.mul_(self.scale_0).add_(grad *self.scale_1)
+                else:
+                  # clone so that we don't modify the grads
+                  exp_avg, exp_avg_sq = state['exp_avg'].clone(), state['exp_avg_sq'].clone()
+                  beta1, beta2 = group['betas']
+
+                  if group['weight_decay'] != 0:
+                      grad.add_(group['weight_decay'], p.data)
+                  # Decay the first and second moment running average coefficient
+                  exp_avg.mul_(beta1).add_(1 - beta1, grad)
+                  exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+
+                  denom = exp_avg_sq.sqrt().add_(group['eps'])
+                  bias_correction1 = 1 - beta1 ** (state['step']+1)
+                  bias_correction2 = 1 - beta2 ** (state['step']+1)
+                  step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+
+                  grad.mul_(step_size).mul_(self.scale_1).div_(denom)
+                  state["dev_grad"].mul_(self.scale_0).add_(grad)
+
+                cosine_prod += (grad * state["dev_grad"]).sum()
+                cosine_norm_train += grad.norm(2) ** 2
+                cosine_norm_dev += state["dev_grad"].norm(2) ** 2
+        cosine_dist = cosine_prod / (cosine_norm_dev.sqrt() * cosine_norm_train.sqrt()+1e-10)
+        self.cur_step += 1
+        return cosine_dist, cosine_prod
+
     def get_cosine_sim_bucketed(self):
         # return a list of cosine sim of base lan and the lan_id
         cosine_prod = 0
@@ -99,8 +139,7 @@ class customAdam(Optimizer):
                 if p.grad is None: continue
                 grad = p.grad.data
                 
-                #if self.hparams.adam_raw_grad:
-                if True:
+                if self.hparams.adam_raw_grad:
                   state["dev_grad"].mul_(self.scale_0).add_(grad *self.scale_1)
                 else:
                   # clone so that we don't modify the grads

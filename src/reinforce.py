@@ -236,9 +236,61 @@ class ReinforceTrainer():
       loss.backward()
       self.actor_optim.step()
       self.actor_optim.zero_grad()
-      if step % self.hparams.print_every == 0:
-        print("eps={}, actor loss={}".format(eps, cur_loss))
-  
+      #if step % self.hparams.print_every == 0:
+      #  print("eps={}, actor loss={}".format(eps, cur_loss))
+
+  def train_score_all(self):
+    step = 0
+    self.nmt_optim.zero_prev_grad()
+    cosine_sim_list = [None for _ in range(self.hparams.lan_size)]
+    # update the actor with graidents scaled by cosine similarity
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_refresh_data():
+      logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
+      logits = logits.view(-1, self.hparams.trg_vocab_size)
+      labels = y_train[:,1:].contiguous().view(-1)
+      cur_nmt_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=self.hparams.pad_id, reduction="none")
+      cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
+      # save the gradients to nmt moving average
+      cur_nmt_loss.backward()
+      grad_norm = torch.nn.utils.clip_grad_norm_(self.nmt_model.parameters(), self.hparams.clip_grad)
+      cosine, dot_prod = self.nmt_optim.get_cosine_sim_all()
+      self.nmt_optim.zero_grad()
+      cosine_sim_list[lan_id[0]] = cosine
+      if eop:
+        break
+
+    grad_scale = torch.FloatTensor(cosine_sim_list).view(1, -1)
+    print(grad_scale.data)
+    if self.hparams.cuda:
+      grad_scale = grad_scale.cuda()
+    for eps in range(self.hparams.train_score_episode):
+      s_0_list = []
+      s_1_list = []
+      mask_list = []
+      for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example_bucketed():
+        s = self.featurizer.get_state(src, src_len, trg)
+        step += 1
+        mask = 1 - s[1].byte()
+        s_0_list.append(s[0])
+        s_1_list.append(s[1])
+        mask_list.append(mask)
+        if eop: break
+      s_0 = torch.cat(s_0_list, dim=0)
+      s_1 = torch.cat(s_1_list, dim=0)
+      mask = torch.cat(mask_list, dim=0)
+      a_logits = self.actor([s_0, s_1])
+      a_logits.masked_fill_(mask, -float("inf"))
+        
+      loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
+      loss = (loss * grad_scale * self.hparams.reward_scale).masked_fill_(mask, 0.).sum().div_(len(s_0_list)) 
+      cur_loss = loss.item()
+      loss.backward()
+      self.actor_optim.step()
+      self.actor_optim.zero_grad()
+      #if step % self.hparams.print_every == 0:
+      #  print("eps={}, actor loss={}".format(eps, cur_loss))
+
+
   def imitate_heuristic(self):
     data_batch, next_data_batch = [], []
     batch_count = 0
@@ -554,6 +606,8 @@ class ReinforceTrainer():
 
       if not self.hparams.not_train_score:
         self.train_score_bucketed(x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count)
+      if self.hparams.train_score_every and self.step % self.hparams.train_score_every == 0:
+        self.train_score_all()
       # clean up GPU memory
       if self.step % hparams.clean_mem_every == 0:
         gc.collect()
