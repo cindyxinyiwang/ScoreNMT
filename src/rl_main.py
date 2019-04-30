@@ -174,9 +174,9 @@ parser.add_argument("--gamma", type=float, default=0.9, help="discount factor")
 parser.add_argument("--replay_mem_size", type=int, default=64, help="replay memory size")
 parser.add_argument("--replay_batch_size", type=int, default=16, help="replay batch size")
 parser.add_argument("--sync_target_every", type=int, default=16, help="sync target Q network every")
-parser.add_argument("--epsilon_max", type=float, default=0.05, help="epsilon greedy")
-parser.add_argument("--epsilon_min", type=float, default=0.05, help="epsilon greedy")
-parser.add_argument("--epsilon_anneal_step", type=float, default=10000, help="epsilon anneal steps")
+parser.add_argument("--epsilon_max", type=float, default=0., help="epsilon greedy")
+parser.add_argument("--epsilon_min", type=float, default=0., help="epsilon greedy")
+parser.add_argument("--epsilon_anneal", type=float, default=10000, help="epsilon anneal steps")
 
 parser.add_argument("--burn_in_size", type=int, default=100, help="number of items init in replay mem")
 parser.add_argument("--test_step", type=int, default=30, help="number of steps for a episode of testing current policy")
@@ -264,12 +264,11 @@ parser.add_argument("--baseline_scale_1", type=float, default=0.8, help="weight 
 
 parser.add_argument("--reverse_sign", action="store_true", help="whether to reverse the sign")
 
-parser.add_argument("--lrl_loss", type=float, default=0., help="weight for lrl loss")
-parser.add_argument("--mask_loss", type=int, default=1, help="whether to reverse the sign")
 parser.add_argument("--norm_bucket_instance", action="store_true", help="whether to reverse the sign")
-parser.add_argument("--shuffle_bucket", type=int, default=1, help="whether to shuffle data in each bucket")
 parser.add_argument("--pretrained_actor", type=str, default="", help="whether to shuffle data in each bucket")
 parser.add_argument("--sorted_data_util", action="store_true", help="whether to reverse the sign")
+parser.add_argument("--train_adam_modified", action="store_true", help="whether to reverse the sign")
+parser.add_argument("--dev_adam_modified", action="store_true", help="whether to reverse the sign")
 args = parser.parse_args()
 
 def train():
@@ -282,293 +281,11 @@ def train():
   else:
     hparams = HParams(**vars(args))
   # build or load model
-  if args.nmt_train:
-    train_nmt(hparams)
-  elif args.nmt_train_prob_lr:
-    train_nmt_prob_lr(hparams)
-  elif args.decode:
-    agent_trainer = ReinforceTrainer(hparams)
-    print("-" * 80)
-    print("Decoding")
-    agent_trainer.decode()
-  else:
-    agent_trainer = ReinforceTrainer(hparams)
-    print("-" * 80)
-    print("Creating model")
-    #agent_trainer.train()
-    agent_trainer.train_rl_and_nmt()
-
-def train_nmt_prob_lr(hparams):
-  data_util = RLDataUtil(hparams)
-  model = Seq2Seq(hparams=hparams, data=data_util)
-  print("initialize uniform with range {}".format(args.init_range))
-  for p in model.parameters():
-    p.data.uniform_(-args.init_range, args.init_range)
-  trainable_params = [
-    p for p in model.parameters() if p.requires_grad]
-  optim = torch.optim.Adam(trainable_params, lr=hparams.lr, weight_decay=hparams.l2_reg)
-  #optim = torch.optim.Adam(trainable_params)
-  step = 0
-  best_val_ppl = [None for _ in range(len(model.hparams.dev_src_file_list))]
-  best_val_bleu = [None for _ in range(len(model.hparams.dev_src_file_list))]
-  cur_attempt = 0
-  lr = hparams.lr
-
-  if args.cuda:
-    model = model.cuda()
-
-  if args.reset_hparams:
-    lr = args.lr
-  crit = get_criterion(hparams)
-  trainable_params = [
-    p for p in model.parameters() if p.requires_grad]
-  num_params = count_params(trainable_params)
-  print("Model has {0} params".format(num_params))
-
+  agent_trainer = ReinforceTrainer(hparams)
   print("-" * 80)
-  print("start training...")
-  start_time = log_start_time = time.time()
-  target_words, total_loss, total_corrects = 0, 0, 0
-  target_rules, target_total, target_eos = 0, 0, 0
-  total_word_loss, total_rule_loss, total_eos_loss = 0, 0, 0
-  model.train()
-  #i = 0
-  epoch = 0
-  tr_loss, update_batch_size = None, 0
-  for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, prob, batch_size, eop) in data_util.next_nmt_train_prob_lr():
-    step += 1
-    target_words += (y_count - batch_size)
-    logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
-    logits = logits.view(-1, hparams.trg_vocab_size)
-    labels = y_train[:,1:].contiguous().view(-1)
-      
-    cur_tr_loss, cur_tr_acc = get_performance(crit, logits, labels, hparams, batch_size=batch_size, element_weight=prob)
-    total_loss += cur_tr_loss.item()
-    total_corrects += cur_tr_acc.item()
-    cur_tr_loss.div_(prob.sum().item() * hparams.update_batch)
-
-    cur_tr_loss.backward()
-    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
-
-    if tr_loss is None:
-      tr_loss = cur_tr_loss.item()
-    else:
-      tr_loss = tr_loss + cur_tr_loss.item()
-
-    if step % args.update_batch == 0:
-      optim.step()
-      optim.zero_grad()
-      tr_loss = None
-      update_batch_size = 0
-    # clean up GPU memory
-    if step % args.clean_mem_every == 0:
-      gc.collect()
-    if eop: 
-      epoch += 1
-    #  get_grad_cos_all(model, data, crit)
-    if (step / args.update_batch) % args.log_every == 0:
-      curr_time = time.time()
-      since_start = (curr_time - start_time) / 60.0
-      elapsed = (curr_time - log_start_time) / 60.0
-      log_string = "ep={0:<3d}".format(epoch)
-      log_string += " steps={0:<6.2f}".format((step / args.update_batch) / 1000)
-      log_string += " lr={0:<9.7f}".format(lr)
-      log_string += " loss={0:<7.2f}".format(cur_tr_loss.item())
-      log_string += " |g|={0:<5.2f}".format(grad_norm)
-
-      log_string += " ppl={0:<8.2f}".format(np.exp(total_loss / target_words))
-      log_string += " acc={0:<5.4f}".format(total_corrects / target_words)
-
-      log_string += " wpm(k)={0:<5.2f}".format(target_words / (1000 * elapsed))
-      log_string += " time(min)={0:<5.2f}".format(since_start)
-      print(log_string)
-    if args.eval_end_epoch:
-      if eop:
-        eval_now = True
-      else:
-        eval_now = False
-    elif (step / args.update_batch) % args.eval_every == 0:
-      eval_now = True
-    else:
-      eval_now = False 
-    if eval_now:
-      based_on_bleu = args.eval_bleu and best_val_ppl[0] is not None and best_val_ppl[0] <= args.ppl_thresh
-      if args.dev_zero: based_on_bleu = True
-      with torch.no_grad():
-        val_ppl, val_bleu, ppl_list, bleu_list = eval(model, data_util, crit, step, hparams, args, eval_bleu=based_on_bleu, valid_batch_size=args.valid_batch_size, tr_logits=logits)	
-      for i in range(len(ppl_list)):
-        if based_on_bleu:
-          if best_val_bleu[i] is None or best_val_bleu[i] <= bleu_list[i]:
-            save = True 
-            best_val_bleu[i] = bleu_list[i]
-            cur_attempt = 0
-          else:
-            save = False
-            cur_attempt += 1
-        else:
-       	  if best_val_ppl[i] is None or best_val_ppl[i] >= ppl_list[i]:
-            save = True
-            best_val_ppl[i] = ppl_list[i]
-            cur_attempt = 0 
-          else:
-            save = False
-            cur_attempt += 1
-        if save or args.always_save:
-          if len(ppl_list) > 1:
-            nmt_save_checkpoint([step, best_val_ppl, best_val_bleu, cur_attempt, lr], model, optim, hparams, args.output_dir + "dev{}".format(i))
-          else:
-            nmt_save_checkpoint([step, best_val_ppl, best_val_bleu, cur_attempt, lr], model, optim, hparams, args.output_dir)
-        elif not args.lr_schedule and step >= hparams.n_warm_ups:
-          lr = lr * args.lr_dec
-          set_lr(optim, lr)
-      # reset counter after eval
-      log_start_time = time.time()
-      target_words = total_corrects = total_loss = 0
-      target_rules = target_total = target_eos = 0
-      total_word_loss = total_rule_loss = total_eos_loss = 0
-    if args.patience >= 0:
-      if cur_attempt > args.patience: break
-    elif args.n_train_epochs > 0:
-      if epoch >= args.n_train_epochs: break
-    else:
-      if step > args.n_train_steps: break
-
-
-def train_nmt(hparams):
-  data_util = RLDataUtil(hparams)
-  model = Seq2Seq(hparams=hparams, data=data_util)
-  print("initialize uniform with range {}".format(args.init_range))
-  for p in model.parameters():
-    p.data.uniform_(-args.init_range, args.init_range)
-  trainable_params = [
-    p for p in model.parameters() if p.requires_grad]
-  optim = torch.optim.Adam(trainable_params, lr=hparams.lr, weight_decay=hparams.l2_reg)
-  #optim = torch.optim.Adam(trainable_params)
-  step = 0
-  best_val_ppl = [None for _ in range(len(model.hparams.dev_src_file_list))]
-  best_val_bleu = [None for _ in range(len(model.hparams.dev_src_file_list))]
-  cur_attempt = 0
-  lr = hparams.lr
-
-  if args.cuda:
-    model = model.cuda()
-
-  if args.reset_hparams:
-    lr = args.lr
-  crit = get_criterion(hparams)
-  trainable_params = [
-    p for p in model.parameters() if p.requires_grad]
-  num_params = count_params(trainable_params)
-  print("Model has {0} params".format(num_params))
-
-  print("-" * 80)
-  print("start training...")
-  start_time = log_start_time = time.time()
-  target_words, total_loss, total_corrects = 0, 0, 0
-  target_rules, target_total, target_eos = 0, 0, 0
-  total_word_loss, total_rule_loss, total_eos_loss = 0, 0, 0
-  model.train()
-  #i = 0
-  epoch = 0
-  tr_loss, update_batch_size = None, 0
-  for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, eop) in data_util.next_nmt_train():
-    step += 1
-    target_words += (y_count - batch_size)
-    logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
-    logits = logits.view(-1, hparams.trg_vocab_size)
-    labels = y_train[:,1:].contiguous().view(-1)
-      
-    cur_tr_loss, cur_tr_acc = get_performance(crit, logits, labels, hparams)
-    total_loss += cur_tr_loss.item()
-    total_corrects += cur_tr_acc.item()
-    cur_tr_loss.div_(batch_size * hparams.update_batch)
-
-    cur_tr_loss.backward()
-    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
-
-    if tr_loss is None:
-      tr_loss = cur_tr_loss.item()
-    else:
-      tr_loss = tr_loss + cur_tr_loss.item()
-
-    if step % args.update_batch == 0:
-      optim.step()
-      optim.zero_grad()
-      tr_loss = None
-      update_batch_size = 0
-    # clean up GPU memory
-    if step % args.clean_mem_every == 0:
-      gc.collect()
-    if eop: 
-      epoch += 1
-    #  get_grad_cos_all(model, data, crit)
-    if (step / args.update_batch) % args.log_every == 0:
-      curr_time = time.time()
-      since_start = (curr_time - start_time) / 60.0
-      elapsed = (curr_time - log_start_time) / 60.0
-      log_string = "ep={0:<3d}".format(epoch)
-      log_string += " steps={0:<6.2f}".format((step / args.update_batch) / 1000)
-      log_string += " lr={0:<9.7f}".format(lr)
-      log_string += " loss={0:<7.2f}".format(cur_tr_loss.item())
-      log_string += " |g|={0:<5.2f}".format(grad_norm)
-
-      log_string += " ppl={0:<8.2f}".format(np.exp(total_loss / target_words))
-      log_string += " acc={0:<5.4f}".format(total_corrects / target_words)
-
-      log_string += " wpm(k)={0:<5.2f}".format(target_words / (1000 * elapsed))
-      log_string += " time(min)={0:<5.2f}".format(since_start)
-      print(log_string)
-    if args.eval_end_epoch:
-      if eop:
-        eval_now = True
-      else:
-        eval_now = False
-    elif (step / args.update_batch) % args.eval_every == 0:
-      eval_now = True
-    else:
-      eval_now = False 
-    if eval_now:
-      based_on_bleu = args.eval_bleu and best_val_ppl[0] is not None and best_val_ppl[0] <= args.ppl_thresh
-      if args.dev_zero: based_on_bleu = True
-      with torch.no_grad():
-        val_ppl, val_bleu, ppl_list, bleu_list = eval(model, data_util, crit, step, hparams, args, eval_bleu=based_on_bleu, valid_batch_size=args.valid_batch_size, tr_logits=logits)	
-      for i in range(len(ppl_list)):
-        if based_on_bleu:
-          if best_val_bleu[i] is None or best_val_bleu[i] <= bleu_list[i]:
-            save = True 
-            best_val_bleu[i] = bleu_list[i]
-            cur_attempt = 0
-          else:
-            save = False
-            cur_attempt += 1
-        else:
-       	  if best_val_ppl[i] is None or best_val_ppl[i] >= ppl_list[i]:
-            save = True
-            best_val_ppl[i] = ppl_list[i]
-            cur_attempt = 0 
-          else:
-            save = False
-            cur_attempt += 1
-        if save or args.always_save:
-          if len(ppl_list) > 1:
-            nmt_save_checkpoint([step, best_val_ppl, best_val_bleu, cur_attempt, lr], model, optim, hparams, args.output_dir + "dev{}".format(i))
-          else:
-            nmt_save_checkpoint([step, best_val_ppl, best_val_bleu, cur_attempt, lr], model, optim, hparams, args.output_dir)
-        elif not args.lr_schedule and step >= hparams.n_warm_ups:
-          lr = lr * args.lr_dec
-          set_lr(optim, lr)
-      # reset counter after eval
-      log_start_time = time.time()
-      target_words = total_corrects = total_loss = 0
-      target_rules = target_total = target_eos = 0
-      total_word_loss = total_rule_loss = total_eos_loss = 0
-    if args.patience >= 0:
-      if cur_attempt > args.patience: break
-    elif args.n_train_epochs > 0:
-      if epoch >= args.n_train_epochs: break
-    else:
-      if step > args.n_train_steps: break
-
+  print("Creating model")
+  agent_trainer.train_rl_and_nmt()
+  return agent_trainer
 
 def main():
   random.seed(args.seed)
@@ -586,24 +303,38 @@ def main():
   #  shutil.rmtree(args.output_dir)
   #  os.makedirs(args.output_dir)
 
-  if args.nmt_train:
-    print("-" * 80)
-    log_file = os.path.join(args.output_dir, "nmt_stdout")
-    print("Logging to {}".format(log_file))
-    sys.stdout = Logger(log_file)
-    train()
-  elif args.decode:
-    print("-" * 80)
-    log_file = os.path.join(args.output_dir, "decode_stdout")
-    print("Logging to {}".format(log_file))
-    sys.stdout = Logger(log_file)
-    train()
-  else:
-    print("-" * 80)
-    log_file = os.path.join(args.output_dir, "stdout")
-    print("Logging to {}".format(log_file))
-    sys.stdout = Logger(log_file)
-    train()
+  print("-" * 80)
+  log_file = os.path.join(args.output_dir, "stdout")
+  print("Logging to {}".format(log_file))
+  sys.stdout = Logger(log_file)
+  agent_trainer = train()
+  # move to CPU for loading translation
+  agent_trainer.nmt_model.cpu()
+  
+  if not args.test_src_file_list:
+    args.test_src_file_list = args.dev_src_file_list.replace("dev", "test")
+  if not args.test_trg_file_list:
+    args.test_trg_file_list = args.dev_trg_file_list.replace("dev", "test")
+  if not args.test_ref_file_list:
+    args.test_ref_file_list = args.dev_ref_file_list.replace("dev", "test")
+  trans_script = 'python3.6 src/translate.py \
+  --model_file="{}/bleu_final_nmt_model.pt" \
+  --hparams_file="{}/bleu_final_nmt_hparams.pt" \
+  --test_src_file_list  {} \
+  --test_trg_file_list  {} \
+  --test_ref_file_list  {} \
+  --test_file_idx_list "0" \
+  --cuda \
+  --merge_bpe \
+  --beam_size=5 \
+  --poly_norm_m=1 \
+  --max_len=200 \
+  --trans_dev \
+  --log_file="{}/bleu_trans_log" \
+  --out_prefix="bleu" \
+  --out_file="{}/bleu-ted-test-b5m1"'.format(args.output_dir, args.output_dir, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, args.output_dir, args.output_dir)
+  out = subprocess.getoutput(trans_script)
+  print(out)
 
   # translate dev test
   trans_script = 'python3.6 src/translate.py \
@@ -622,24 +353,6 @@ def main():
   --log_file="{}/ppl_trans_log" \
   --out_prefix="ppl" \
   --out_file="{}/ppl-ted-test-b5m1"'.format(args.output_dir, args.output_dir, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, args.output_dir, args.output_dir)
-  out = subprocess.getoutput(trans_script)
-  print(out)
-  trans_script = 'python3.6 src/translate.py \
-  --model_file="{}/bleu_final_nmt_model.pt" \
-  --hparams_file="{}/bleu_final_nmt_hparams.pt" \
-  --test_src_file_list  {} \
-  --test_trg_file_list  {} \
-  --test_ref_file_list  {} \
-  --test_file_idx_list "0" \
-  --cuda \
-  --merge_bpe \
-  --beam_size=5 \
-  --poly_norm_m=1 \
-  --max_len=200 \
-  --trans_dev \
-  --log_file="{}/bleu_trans_log" \
-  --out_prefix="bleu" \
-  --out_file="{}/bleu-ted-test-b5m1"'.format(args.output_dir, args.output_dir, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, args.output_dir, args.output_dir)
   out = subprocess.getoutput(trans_script)
   print(out)
 if __name__ == "__main__":

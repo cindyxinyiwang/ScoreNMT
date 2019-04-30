@@ -135,7 +135,7 @@ class ReinforceTrainer():
       print("Actor Model has {0} params".format(num_params))
       self.actor_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_q, weight_decay=self.hparams.l2_reg)
 
-      if self.hparams.imitate_episode:
+      if self.hparams.imitate_episode or self.hparams.epsilon_max:
         if self.hparams.imitate_type == "heuristic":
           self.heuristic_actor = HeuristicActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         elif self.hparams.imitate_type == "init":
@@ -517,7 +517,6 @@ class ReinforceTrainer():
       labels = y_train[:,1:].contiguous().view(-1)
       cur_nmt_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=self.hparams.pad_id, reduction="none")
       cur_nmt_loss = cur_nmt_loss.view(batch_size, -1).sum().div_(batch_size * self.hparams.update_batch)
-      # save the gradients to nmt moving average
       cur_nmt_loss.backward()
       break
 
@@ -530,15 +529,7 @@ class ReinforceTrainer():
     s = self.featurizer.get_state(src, src_len, trg)
     mask = 1 - s[1].byte()
     a_logits = self.actor([s[0], s[1]])
-    if self.hparams.lrl_loss:
-      lrl_vec = [self.hparams.base_lan_id]
-      lrl_label = torch.LongTensor(lrl_vec)
-      if self.hparams.cuda:
-        lrl_label = lrl_label.cuda()
-      lrl_loss = torch.nn.functional.cross_entropy(a_logits, lrl_label).sum()
-    else:
-      if self.hparams.mask_loss:
-        a_logits.masked_fill_(mask, -float("inf"))
+    a_logits.masked_fill_(mask, -float("inf"))
  
     if self.hparams.reverse_sign:
       loss = torch.nn.functional.log_softmax(a_logits, dim=-1)
@@ -560,8 +551,6 @@ class ReinforceTrainer():
       if self.hparams.cuda:
         bucket_instance_count = bucket_instance_count.cuda()
       loss.div_(bucket_instance_count)
-    if self.hparams.lrl_loss:
-      loss = loss + lrl_loss * self.hparams.lrl_loss
     loss.backward()
     self.actor_optim.step()
     self.actor_optim.zero_grad()
@@ -592,9 +581,21 @@ class ReinforceTrainer():
     #i = 0
     #epoch = 0
     update_batch_size = 0
-    #for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in data_util.next_nmt_train():
-    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, self.actor):
+    if self.hparams.epsilon_max:
+      actor = self.actor
+    else:
+      actor = self.heuristic_actor
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer, actor):
       self.step += 1
+      if self.hparams.epsilon_max:
+        if self.step < self.hparams.epsilon_anneal:
+          epsilon = self.hparams.epsilon_max - self.step / self.hparams.epsilon_anneal * (self.hparams.epsilon_max-self.hparams.epsilon_min)
+        else:
+          epsilon = self.hparams.epsilon_min
+        if random.random() < self.epsilon_max:
+          actor = self.heuristic_actor
+        else:
+          actor = self.actor
       target_words += (y_count - batch_size)
       logits = model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=self.step, x_rank=[])
       logits = logits.view(-1, hparams.trg_vocab_size)
