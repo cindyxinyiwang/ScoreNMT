@@ -553,7 +553,7 @@ class ReinforceTrainer():
       print("grad_cosine={}".format(grad_cosine.item()))
     if self.hparams.baseline:
       grad_reward = grad_reward - self.baseline
-      self.baseline = self.baseline_scale_0 * self.baseline + self.baseline_scale_1 * grad_reward
+      self.baseline = self.hparams.baseline_scale_0 * self.baseline + self.hparams.baseline_scale_1 * grad_reward
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
       loss.div_(bucket_instance_count)
