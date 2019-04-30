@@ -227,7 +227,7 @@ parser.add_argument("--actor_type", type=str, default="base", help="[base|emb]")
 parser.add_argument("--add_bias", type=int, default=1, help="whether to add bias to actor logits")
 parser.add_argument("--imitate_episode", type=int, default=0, help="episodes to imitate")
 
-parser.add_argument("--train_score_every", type=int, default=10000, help="episodes to imitate")
+parser.add_argument("--train_score_every", type=int, default=0, help="episodes to imitate")
 parser.add_argument("--record_grad_step", type=int, default=50, help="episodes to imitate")
 
 parser.add_argument("--not_train_score", action="store_true", help="do not train the score function")
