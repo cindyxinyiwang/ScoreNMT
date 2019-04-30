@@ -11,6 +11,7 @@ import numpy as np
 from utils import *
 from model import *
 from rl_data_utils import RLDataUtil 
+from rl_data_utils_unsort import RLDataUtilUnsort 
 from featurizer import *
 from actor import *
 from customAdam import *
@@ -89,7 +90,10 @@ def get_val_ppl(model, data_loader, hparams, crit, step, load_full, log):
 class ReinforceTrainer():
   def __init__(self, hparams):
     self.hparams = hparams
-    self.data_loader = RLDataUtil(hparams)
+    if self.hparams.sorted_data_util:
+      self.data_loader = RLDataUtil(hparams)
+    else:
+      self.data_loader = RLDataUtilUnsort(hparams)
 
     print("Training RL...")
     if self.hparams.load_model:
