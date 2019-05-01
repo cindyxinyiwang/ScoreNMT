@@ -16,6 +16,30 @@ from collections import defaultdict, deque
 import copy
 import time
 
+class BiasActor(nn.Module):
+  def __init__(self, hparams, num_feature, lan_dist_vec):
+    super(BiasActor, self).__init__()
+    self.hparams = hparams
+    hidden_size = hparams.d_hidden
+    self.lan_dist_vec = Variable(torch.FloatTensor(lan_dist_vec.tolist()) / 10)
+    # init
+    self.bias = torch.nn.Linear(self.hparams.lan_size, 1)
+    for p in self.bias.parameters():
+      init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
+      
+    if self.hparams.add_bias:
+      self.bias.weight = torch.nn.Parameter(torch.FloatTensor([[self.hparams.bias for _ in range(self.hparams.lan_size)]]))
+      self.bias.weight.requires_grad = False
+    if self.hparams.cuda:
+      self.bias = self.bias.cuda()
+
+  def forward(self, feature):
+    #(model_feature, language_feature, data_feature) = feature
+    feature, existed_src = feature
+    batch_size = feature.size(0)
+    logits = self.bias.weight * feature
+    return logits
+
 class Actor(nn.Module):
   def __init__(self, hparams, num_feature, lan_dist_vec):
     super(Actor, self).__init__()
