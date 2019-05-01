@@ -543,8 +543,8 @@ class ReinforceTrainer():
       print("grad_prod={}".format(grad_prod.item()))
       print("grad_cosine={}".format(grad_cosine.item()))
     if self.hparams.baseline:
-      grad_reward = grad_reward - self.baseline
       self.baseline = self.hparams.baseline_scale_0 * self.baseline + self.hparams.baseline_scale_1 * grad_reward
+      grad_reward = grad_reward - self.baseline
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
       bucket_instance_count = torch.FloatTensor(bucket_instance_count)
