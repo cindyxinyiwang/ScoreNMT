@@ -122,6 +122,9 @@ class ReinforceTrainer():
         if self.hparams.actor_type == "base":
           self.featurizer = Featurizer(hparams, self.data_loader)
           self.actor = Actor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
+        elif self.hparams.actor_type == "bias":
+          self.featurizer = Featurizer(hparams, self.data_loader)
+          self.actor = BiasActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         elif self.hparams.actor_type == "emb":
           self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
           self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
