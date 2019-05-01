@@ -521,7 +521,7 @@ class RLDataUtilUnsort(object):
      lan_selected_times = [0 for _ in range(self.hparams.lan_size)]
      
      if self.hparams.batcher == "word":
-       start_index, end_index, count, max_len = 0, 0, 0, 0
+       start_index, end_index, count, max_len, effective_count, sent_count = 0, 0, 0, 0, 0, 0
        bucket_change, sampled_idx = True, 0
        while True:
          src_list, trg, src_len = self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_line]
@@ -530,7 +530,7 @@ class RLDataUtilUnsort(object):
            a_logits = actor(s)
            mask = 1 - s[1].byte()
            a_logits.masked_fill_(mask, -float("inf"))
-           prob = torch.nn.functional.softmax(a_logits, -1)
+           prob = torch.nn.functional.softmax(a_logits*self.hparams.actor_temperature, -1)
            prob = [float(repr(i)) for i in prob.data.view(-1).cpu().numpy()]
            prob = np.array(prob)
            prob = (prob / sum(prob)).tolist()
@@ -557,8 +557,12 @@ class RLDataUtilUnsort(object):
            x_tmp.append(src_list[src_idx])
            y_tmp.append(trg)
            count += (len(x_tmp[-1]) + len(y_tmp[-1]))
+           max_len = max(max_len, len(x_tmp[-1]))
+           max_len = max(max_len, len(y_tmp[-1]))
+           sent_count += 1
            selected_idx.append(src_idx)
          count_words = count
+         effective_count = max_len * 2* sent_count
          if count_words > self.hparams.batch_size:
            break
          else:
@@ -918,11 +922,11 @@ class RLDataUtilUnsort(object):
     mask = [[0]*l + [1]*(max_len - l) for l in lengths]
     mask = torch.ByteTensor(mask)
     pos_emb_indices = [[i+1 for i in range(l)] + ([0]*(max_len - l)) for l in lengths]
-    pos_emb_indices = Variable(torch.FloatTensor(pos_emb_indices))
+    #pos_emb_indices = Variable(torch.FloatTensor(pos_emb_indices))
     if self.hparams.cuda:
       if sentences:
         padded_sentences = padded_sentences.cuda()
-      pos_emb_indices = pos_emb_indices.cuda()
+      #pos_emb_indices = pos_emb_indices.cuda()
       mask = mask.cuda()
     return padded_sentences, mask, count, lengths, pos_emb_indices, char_sparse, padded_x_rank
 

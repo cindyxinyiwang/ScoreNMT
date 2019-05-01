@@ -587,6 +587,8 @@ class ReinforceTrainer():
       self.data_loader.actor = self.actor
     for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count) in self.data_loader.next_sample_nmt_train_bucketed(self.featurizer):
       self.step += 1
+      if self.step % self.hparams.clean_mem_every == 0:
+        gc.collect()
       if self.hparams.epsilon_max:
         if self.step < self.hparams.epsilon_anneal:
           epsilon = self.hparams.epsilon_max - self.step / self.hparams.epsilon_anneal * (self.hparams.epsilon_max-self.hparams.epsilon_min)
