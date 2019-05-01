@@ -163,12 +163,21 @@ class customAdam(Optimizer):
                 p.data.addcdiv_(-step_size, exp_avg, denom)
                 
                 if self.hparams.adam_raw_grad:
-                  state["train_grad"].mul_(self.scale_0).add_(grad*self.scale_1)
+                  if self.hparams.train_adam_noscale:
+                    state["train_grad"] = grad
+                  else:
+                    state["train_grad"].mul_(self.scale_0).add_(grad*self.scale_1)
                 else:
                   if self.hparams.train_adam_modified:
-                    state["train_grad"].mul_(self.scale_0).add_(grad*step_size*self.scale_1/denom)
+                    if self.hparams.train_adam_noscale:
+                      state["train_grad"] = grad*step_size/denom
+                    else:
+                      state["train_grad"].mul_(self.scale_0).add_(grad*step_size*self.scale_1/denom)
                   else:
-                    state["train_grad"].mul_(self.scale_0).add_(exp_avg*step_size*self.scale_1/denom)
+                    if self.hparams.train_adam_noscale:
+                      state["train_grad"] = exp_avg*step_size/denom
+                    else:
+                      state["train_grad"].mul_(self.scale_0).add_(exp_avg*step_size*self.scale_1/denom)
         return loss
 
     #########

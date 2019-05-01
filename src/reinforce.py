@@ -711,6 +711,8 @@ class ReinforceTrainer():
     # imitate a good policy agent first
     if self.hparams.imitate_episode:
       self.imitate_heuristic()
+    if self.hparams.epsilon_max:
+      self.heuristic_actor = HeuristicActor(self.hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
     while True:
       # use current policy to load data
       #output_prob_file = self.hparams.output_prob_file + str(iteration)
