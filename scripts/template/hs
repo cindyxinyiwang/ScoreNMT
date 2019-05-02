@@ -7,7 +7,7 @@
 #export PYTHONPATH="$(pwd)"
 #export CUDA_VISIBLE_DEVICES="0"
 
-DDIR=/home/xinyiw1/ScoreNMT/
+DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
