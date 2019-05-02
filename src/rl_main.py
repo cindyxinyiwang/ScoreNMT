@@ -224,7 +224,7 @@ parser.add_argument("--iteration", type=int, default=1, help="number of times to
 parser.add_argument("--random_rl_train", type=int, default=0, help="whether to randomize rl training data feed")
 
 parser.add_argument("--discard_bias", type=int, default=-100, help="bias term to discard a sentence")
-parser.add_argument("--feature_type", type=str, default="lan_dist", help="[lan_dist|zero_one]")
+parser.add_argument("--feature_type", type=str, default="lan_dist", help="[lan_dist|zero_one|one]")
 
 parser.add_argument("--actor_type", type=str, default="base", help="[base|emb|bias]")
 parser.add_argument("--add_bias", type=int, default=1, help="whether to add bias to actor logits")

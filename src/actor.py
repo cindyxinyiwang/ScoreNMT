@@ -40,6 +40,51 @@ class BiasActor(nn.Module):
     logits = self.bias.weight * feature
     return logits
 
+class BiasActor(nn.Module):
+  def __init__(self, hparams, num_feature):
+    super(Actor, self).__init__()
+    self.hparams = hparams
+    hidden_size = hparams.d_hidden
+    self.w = nn.Linear(num_feature, hidden_size, bias=False)
+    self.w2 = nn.Linear(hidden_size, hidden_size, bias=False)
+    self.decoder = nn.Linear(hidden_size, self.hparams.lan_size, bias=False)
+    self.bias = nn.Linear(1, self.hparams.lan_size, bias=False)
+    # init
+    for p in self.decoder.parameters():
+      init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
+    for p in self.w.parameters():
+      init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
+      #init.uniform_(p, -0.1, 0.1)
+    for p in self.w2.parameters():
+      init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
+      #init.uniform_(p, -0.1, 0.1)
+    for p in self.bias.parameters():
+      init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
+      
+    #self.decoder.bias = torch.nn.Parameter(torch.FloatTensor(lan_dist_vec))
+    if self.hparams.cuda:
+      self.lan_dist_vec = self.lan_dist_vec.cuda()
+      self.w = self.w.cuda()
+      self.w2 = self.w2.cuda()
+      self.decoder = self.decoder.cuda()
+      self.bias = self.bias.cuda()
+
+  def forward(self, feature):
+    #(model_feature, language_feature, data_feature) = feature
+    feature, existed_src = feature
+    batch_size = feature.size(0)
+
+    if self.hparams.norm_feature:
+      enc = self.w(feature / feature.sum(dim=-1).view(batch_size, -1))
+    else:
+      enc = self.w(feature)
+    enc = torch.relu(enc)
+    enc = self.w2(enc)
+    enc = torch.relu(enc)
+    bias = self.bias.weight
+    logit = self.decoder(enc) + bias
+    return logit
+
 class Actor(nn.Module):
   def __init__(self, hparams, num_feature, lan_dist_vec):
     super(Actor, self).__init__()
