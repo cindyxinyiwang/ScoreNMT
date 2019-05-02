@@ -239,7 +239,7 @@ class ReinforceTrainer():
       s_0_list = []
       s_1_list = []
       mask_list = []
-      for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example():
+      for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example_normal():
         s = self.featurizer.get_state(src, src_len, trg)
         step += 1
         mask = 1 - s[1].byte()
@@ -482,27 +482,33 @@ class ReinforceTrainer():
         with torch.no_grad():
           val_ppl, val_bleu, ppl_list, bleu_list = eval(model, self.data_loader, self.step, hparams, hparams, eval_bleu=based_on_bleu, valid_batch_size=hparams.valid_batch_size, tr_logits=logits)	
         for i in range(len(ppl_list)):
+          save_bleu, save_ppl = False, False
           if based_on_bleu:
             if self.best_val_bleu[i] is None or self.best_val_bleu[i] <= bleu_list[i]:
-              save = True 
+              save_bleu = True 
               self.best_val_bleu[i] = bleu_list[i]
               self.cur_attempt = 0
             else:
-              save = False
+              save_bleu = False
               self.cur_attempt += 1
+          if self.best_val_ppl[i] is None or self.best_val_ppl[i] >= ppl_list[i]:
+            save_ppl = True
+            self.best_val_ppl[i] = ppl_list[i]
+            self.cur_attempt = 0 
           else:
-            if self.best_val_ppl[i] is None or self.best_val_ppl[i] >= ppl_list[i]:
-              save = True
-              self.best_val_ppl[i] = ppl_list[i]
-              self.cur_attempt = 0 
-            else:
-              save = False
-              self.cur_attempt += 1
-          if save:
-            if len(ppl_list) > 1:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim)
-            else:
-              nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim)
+            save_ppl = False
+            self.cur_attempt += 1
+          if save_bleu or save_ppl:
+            if save_bleu:
+              if len(ppl_list) > 1:
+                nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim, prefix="bleu_")
+              else:
+                nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim, prefix="bleu_")
+            if save_ppl:
+             if len(ppl_list) > 1:
+               nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir + "dev{}".format(i), self.actor, self.actor_optim, prefix="ppl_")
+             else:
+               nmt_save_checkpoint([self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch], model, optim, hparams, hparams.output_dir, self.actor, self.actor_optim, prefix="ppl_")
           elif not hparams.lr_schedule and self.step >= hparams.n_warm_ups:
             self.lr = self.lr * hparams.lr_dec
             set_lr(optim, self.lr)

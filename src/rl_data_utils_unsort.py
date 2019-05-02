@@ -630,7 +630,7 @@ class RLDataUtilUnsort(object):
       mask = 1 - s[1].byte()
       a_logits.masked_fill_(mask, -float("inf"))
       a, prob = sample_action(a_logits, temp=1., log=False)
-      if idx % self.hparams.print_every == 0:
+      if idx % 10000 == 0:
         #print(s[1])
         print("lan_probs="+str(prob))
       for src_idx, p in enumerate(prob):
