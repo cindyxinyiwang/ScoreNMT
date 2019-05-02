@@ -30,10 +30,13 @@ class Featurizer():
       #data_feature = np.append(src_dist, [iter_percent, cur_dev_ppl]).reshape(1, -1)
       #data_feature = np.append(src_dist, [iter_percent]).reshape(1, -1)
       data_feature = src_dist.reshape(1, -1)
+      data_feature = Variable(torch.FloatTensor(data_feature))
     elif self.hparams.feature_type == "zero_one":
       data_feature = existed_src.reshape(1, -1)
+      data_feature = Variable(torch.FloatTensor(data_feature))
+    elif self.hparams.feature_type == "one":
+      data_feature = Variable(torch.ones((1, len(existed_src)))) 
 
-    data_feature = Variable(torch.FloatTensor(data_feature))
     existed_src = Variable(torch.FloatTensor([existed_src.tolist()]))
     if self.hparams.cuda: 
       data_feature = data_feature.cuda()
