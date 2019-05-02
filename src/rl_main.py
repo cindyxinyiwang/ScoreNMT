@@ -276,6 +276,7 @@ parser.add_argument("--train_adam_noscale", action="store_true", help="whether t
 parser.add_argument("--actor_temperature", type=float, default=1.0, help="temperature for actor")
 parser.add_argument("--a2c", action="store_true", help="whether to reverse the sign")
 parser.add_argument("--sort_bucket", type=int, default=1, help="temperature for actor")
+parser.add_argument("--imitate_temperature", type=float, default=1., help="whether to shuffle data in each bucket")
 args = parser.parse_args()
 
 def train():
