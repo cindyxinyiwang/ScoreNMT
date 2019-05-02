@@ -113,6 +113,7 @@ parser.add_argument("--n_train_epochs", type=int, default=0, help="n_train_epoch
 parser.add_argument("--dropout", type=float, default=0., help="probability of dropping")
 parser.add_argument("--lr", type=float, default=0.001, help="learning rate")
 parser.add_argument("--lr_q", type=float, default=0.001, help="learning rate for q function")
+parser.add_argument("--lr_critic", type=float, default=0.001, help="learning rate for the critic")
 parser.add_argument("--lr_dec", type=float, default=0.5, help="learning rate decay")
 parser.add_argument("--lr_min", type=float, default=0.0001, help="min learning rate")
 parser.add_argument("--lr_max", type=float, default=0.001, help="max learning rate")
@@ -129,6 +130,7 @@ parser.add_argument("--seed", type=int, default=19920206, help="random seed")
 
 parser.add_argument("--init_range", type=float, default=0.1, help="L2 init range")
 parser.add_argument("--actor_init_range", type=float, default=0.1, help="L2 init range")
+parser.add_argument("--critic_init_range", type=float, default=0.1, help="L2 init range")
 parser.add_argument("--init_type", type=str, default="uniform", help="uniform|xavier_uniform|xavier_normal|kaiming_uniform|kaiming_normal")
 
 parser.add_argument("--share_emb_softmax", action="store_true", help="weight tieing")
@@ -203,6 +205,7 @@ parser.add_argument("--pretrain_nmt_epoch", type=int, default=0, help="whether t
 parser.add_argument("--add_dev_logit_feature", type=int, default=0, help="whether to features from dev logits")
 
 parser.add_argument("--d_hidden", type=int, default=128, help="dimension of hidden of Q network")
+parser.add_argument("--d_hidden_critic", type=int, default=128, help="dimension of hidden of Q network")
 parser.add_argument("--reward_type", type=str, default="fixed", help="[fixed|dynamic]")
 parser.add_argument("--data_name", type=str, default="tiny", help="dir name of processed data")
 parser.add_argument("--episode", type=int, default=10, help="number of episode")
@@ -270,6 +273,7 @@ parser.add_argument("--sorted_data_util", action="store_true", help="whether to 
 parser.add_argument("--train_adam_modified", action="store_true", help="whether to reverse the sign")
 parser.add_argument("--dev_adam_modified", action="store_true", help="whether to reverse the sign")
 parser.add_argument("--train_adam_noscale", action="store_true", help="whether to reverse the sign")
+parser.add_argument("--a2c", action="store_true", help="whether to reverse the sign")
 args = parser.parse_args()
 
 def train():
