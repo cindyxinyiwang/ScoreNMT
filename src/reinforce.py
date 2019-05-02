@@ -333,7 +333,7 @@ class ReinforceTrainer():
           a_logits.masked_fill_(mask, -float("inf"))
           a_prob = torch.nn.functional.softmax(a_logits, dim=-1)
           a_target_logits.masked_fill_(mask, -float("inf"))
-          a_target_prob = torch.nn.functional.softmax(a_target_logits, dim=-1)
+          a_target_prob = torch.nn.functional.softmax(a_target_logits*self.hparams.imitate_temperature, dim=-1)
           loss = torch.nn.functional.mse_loss(a_prob, a_target_prob)
           cur_loss = loss.item()
           loss.backward()
