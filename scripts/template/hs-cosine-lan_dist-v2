@@ -12,7 +12,7 @@ DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_sSEED/hs-cosine-lan_dist-v2_IL/" \
+  --output_dir="outputs_sSEED/hs-cosine-lan_dist-v2_DATA_IL/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/IL_eng/ted-dev.mtok.spm8000.IL \
