@@ -24,7 +24,7 @@ python3.6 src/rl_main.py \
   --char_ngram_n 4 \
   --src_char_vocab_size="8000" \
   --trg_vocab  "$DDIR"data_moses/eng/ted-train.mtok.spm8000.eng.vocab \
-  --lang_file langs_tiny.txt \
+  --lang_file langs_DATA.txt \
   --lan_dist_file "$DDIR"ted-train-vocab.mtok.sim-ngram.graph \
   --base_lan "IL" \
   --d_word_vec=128 \
@@ -52,7 +52,7 @@ python3.6 src/rl_main.py \
   --init_load_time=5 \
   --train_score_every=20000 \
   --record_grad_step=100 \
-  --data_name="tiny" \
+  --data_name="DATA" \
   --d_hidden 32 \
   --adam_raw_grad=0 \
   --cuda \
