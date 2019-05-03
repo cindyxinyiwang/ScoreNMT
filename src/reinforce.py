@@ -160,8 +160,8 @@ class ReinforceTrainer():
         elif self.hparams.imitate_type == "init":
           self.actor = InitActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         else:
-          print("actor not implemented")
-          exit(0)
+          print("uniform actor")
+          pass
 
       self.start_time = time.time()
       trainable_params = [
