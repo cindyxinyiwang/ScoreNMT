@@ -7,7 +7,8 @@
 #export PYTHONPATH="$(pwd)"
 #export CUDA_VISIBLE_DEVICES="3"
 
-DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+#DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+DDIR=/home/xinyiw1/ScoreNMT/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
@@ -31,7 +32,7 @@ python3.6 src/rl_main.py \
   --d_model=512 \
   --log_every=50 \
   --eval_every=2500 \
-  --ppl_thresh=15 \
+  --ppl_thresh=THRESH \
   --merge_bpe \
   --eval_bleu \
   --batcher='word' \
@@ -41,7 +42,7 @@ python3.6 src/rl_main.py \
   --lr 0.001 \
   --n_train_epochs=20 \
   --dropout 0.3 \
-  --max_len 380 \
+  --max_len 250 \
   --agent_subsample_line 160 \
   --print_every 50 \
   --train_score_every=1978056 \
