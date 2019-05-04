@@ -7,14 +7,14 @@
 #export PYTHONPATH="$(pwd)"
 #export CUDA_VISIBLE_DEVICES="3"
 
-#DDIR=/home/hyhieu/xinyiw/ScoreNMT/
-#DDIR=/home/xinyiw1/ScoreNMT/
 DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+#DDIR=/home/xinyiw1/ScoreNMT/
+#DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_sSEED/uniform-cosine-zero_one_DATA_IL/" \
+  --output_dir="outputs_sSEED/cur_DATA_IL/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/IL_eng/ted-dev.mtok.spm8000.IL \
@@ -41,27 +41,20 @@ python3.6 src/rl_main.py \
   --raw_batch_size 1 \
   --lr_dec 1.0 \
   --lr 0.001 \
-  --lr_q 0.0001 \
-  --refresh_base_grad=0 \
-  --refresh_all_grad=1 \
   --n_train_epochs=20 \
   --dropout 0.3 \
   --max_len 250 \
   --agent_subsample_line 160 \
-  --train_score_episode=100 \
   --print_every 50 \
-  --init_train_score_every=5000 \
-  --init_load_time=5 \
-  --train_score_every=20000 \
-  --record_grad_step=100 \
+  --train_score_every=1978056 \
+  --record_grad_step=0 \
   --data_name="DATA" \
   --d_hidden 32 \
-  --adam_raw_grad=0 \
   --cuda \
   --imitate_episode 0 \
+  --imitate_type "init" \
   --actor_type="base" \
-  --imitate_type "" \
   --feature_type="zero_one" \
-  --norm_feature \
   --add_bias=0 \
+  --not_train_score \
   --seed SEED
