@@ -3,13 +3,13 @@ TEMP_DIR=scripts/template/
 # change random seed and directory name as desired
 CFG_DIR=cfg_s1/
 SEED=1
-DATA=tal
-THRESH=18
+DATA=tiny
+THRESH=15
 
 mkdir -p scripts/"$CFG_DIR"
 # low-resource language codes
 ILS=(
-  tam)
+  aze)
 #  glg)
 
 for i in ${!ILS[*]}; do
