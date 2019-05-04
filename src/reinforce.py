@@ -14,6 +14,7 @@ from rl_data_utils import RLDataUtil
 from rl_data_utils_unsort import RLDataUtilUnsort 
 from featurizer import *
 from actor import *
+from critic import *
 from customAdam import *
 from customSGD import *
 
@@ -131,6 +132,13 @@ class ReinforceTrainer():
         else:
           print("actor not implemented")
           exit(0)
+      if self.hparams.a2c:
+        self.critic = Critic(hparams, self.featurizer.num_feature)
+        trainable_params = [
+          p for p in self.critic.parameters() if p.requires_grad]
+        num_params = count_params(trainable_params)
+        print("Critic Model has {0} params".format(num_params))
+        self.critic_optim = torch.optim.Adam(trainable_params, lr=self.hparams.lr_critic, weight_decay=self.hparams.l2_reg)
 
       trainable_params = [
         p for p in self.actor.parameters() if p.requires_grad]
@@ -548,6 +556,20 @@ class ReinforceTrainer():
     if self.hparams.baseline:
       self.baseline = self.hparams.baseline_scale_0 * self.baseline + self.hparams.baseline_scale_1 * grad_reward
       grad_reward = grad_reward - self.baseline
+      if self.step % self.hparams.print_every == 0:
+        print("baseline={}".format(self.baseline))
+    elif self.hparams.a2c:
+      critic_pred = self.critic.forward([s[0], s[1]]).view(-1)
+      grad_reward = torch.FloatTensor([grad_reward]).view(-1)
+      if self.hparams.cuda: grad_reward = grad_reward.cuda()
+      # optimize critic
+      critic_loss = torch.nn.functional.mse_loss(critic_pred, grad_reward)
+      critic_loss.backward()
+      self.critic_optim.step()
+      self.critic_optim.zero_grad()
+      grad_reward = grad_reward - critic_pred.detach()
+      if self.step % self.hparams.print_every == 0:
+        print("critic_pred={}".format(critic_pred.item()))
     loss = (loss * grad_reward * lan_selected_times * self.hparams.reward_scale).sum()
     if self.hparams.norm_bucket_instance:
       bucket_instance_count = torch.FloatTensor(bucket_instance_count)
