@@ -7,9 +7,9 @@
 #export PYTHONPATH="$(pwd)"
 #export CUDA_VISIBLE_DEVICES="2"
 
-#DDIR="/home/xinyiw/multv-nmt/" 
+DDIR="/home/xinyiw/multv-nmt/" 
 #DDIR="/home/hyhieu/xinyiw/multv-nmt/" 
-DDIR="/home/hyhieu/xinyiw/ScoreNMT/" 
+#DDIR="/home/hyhieu/xinyiw/ScoreNMT/" 
 
 python3.6 src/translate.py \
   --model_file="outputs_VERSION/NAME/bleu_final_nmt_model.pt" \
@@ -50,4 +50,3 @@ python3.6 src/translate.py \
 #  --out_prefix="ppl" \
 #  --log_file="outputs_VERSION/NAME/ppl_trans_log" \
 #  --out_file="outputs_VERSION/NAME/ppl-ted-test-b5m1"  
-#
