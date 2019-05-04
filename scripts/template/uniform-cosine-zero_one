@@ -8,7 +8,8 @@
 #export CUDA_VISIBLE_DEVICES="3"
 
 #DDIR=/home/hyhieu/xinyiw/ScoreNMT/
-DDIR=/home/xinyiw1/ScoreNMT/
+#DDIR=/home/xinyiw1/ScoreNMT/
+DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
