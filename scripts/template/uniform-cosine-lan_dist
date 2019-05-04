@@ -47,7 +47,7 @@ python3.6 src/rl_main.py \
   --n_train_epochs=20 \
   --dropout 0.3 \
   --max_len 250 \
-  --agent_subsample_line 16000 \
+  --agent_subsample_line 160 \
   --train_score_episode=100 \
   --print_every 50 \
   --init_train_score_every=5000 \

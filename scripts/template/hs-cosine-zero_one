@@ -47,7 +47,7 @@ python3.6 src/rl_main.py \
   --n_train_epochs=20 \
   --dropout 0.3 \
   --max_len 250 \
-  --agent_subsample_line 16000 \
+  --agent_subsample_line 160 \
   --train_score_episode=100 \
   --print_every 50 \
   --train_score_every=50000 \
@@ -58,7 +58,7 @@ python3.6 src/rl_main.py \
   --reward_scale=0.01 \
   --grad_dist="cosine" \
   --cuda \
-  --imitate_episode 2 \
+  --imitate_episode 20 \
   --imitate_type "heuristic" \
   --actor_type="base" \
   --feature_type="zero_one" \
