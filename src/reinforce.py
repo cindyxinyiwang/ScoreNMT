@@ -98,16 +98,16 @@ class ReinforceTrainer():
 
     print("Training RL...")
     if self.hparams.load_model:
-      self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_model.pt")) 
-      self.nmt_optim = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_optim.pt")) 
-      self.actor = torch.load(os.path.join(self.hparams.output_dir, "actor.pt"))
-      self.actor_optim = torch.load(os.path.join(self.hparams.output_dir, "actor_optim.pt"))
+      self.nmt_model = torch.load(os.path.join(self.hparams.output_dir, "bleu_final_nmt_model.pt")) 
+      self.nmt_optim = torch.load(os.path.join(self.hparams.output_dir, "bleu_final_nmt_optim.pt")) 
+      self.actor = torch.load(os.path.join(self.hparams.output_dir, "bleu_actor.pt"))
+      self.actor_optim = torch.load(os.path.join(self.hparams.output_dir, "bleu_actor_optim.pt"))
       if self.hparams.actor_type == "base":
         self.featurizer = Featurizer(hparams, self.data_loader)
       elif self.hparams.actor_type == "emb":
         self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
       self.start_time = time.time()
-      [self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch] = torch.load(os.path.join(self.hparams.output_dir, "final_nmt_extras.pt"))
+      [self.step, self.best_val_ppl, self.best_val_bleu, self.cur_attempt, self.lr, self.epoch] = torch.load(os.path.join(self.hparams.output_dir, "bleu_final_nmt_extras.pt"))
       if self.hparams.cuda:
        self.nmt_model = self.nmt_model.cuda()
        self.actor = self.actor.cuda()
@@ -745,7 +745,7 @@ class ReinforceTrainer():
 
   def train_rl_and_nmt(self):
     # imitate a good policy agent first
-    if self.hparams.imitate_episode:
+    if self.hparams.imitate_episode and not self.hparams.load_model:
       self.imitate_heuristic()
     if self.hparams.epsilon_max:
       self.heuristic_actor = HeuristicActor(self.hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)

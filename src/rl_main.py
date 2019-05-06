@@ -280,14 +280,15 @@ parser.add_argument("--imitate_temperature", type=float, default=1., help="wheth
 args = parser.parse_args()
 
 def train():
-  if args.load_model and (not args.reset_hparams):
-    print("load hparams..")
-    hparams_file_name = os.path.join(args.output_dir, "hparams.pt")
-    hparams = torch.load(hparams_file_name)
-    hparams.load_model = args.load_model
-    hparams.n_train_steps = args.n_train_steps
-  else:
-    hparams = HParams(**vars(args))
+  #if args.load_model and (not args.reset_hparams):
+  #  print("load hparams..")
+  #  hparams_file_name = os.path.join(args.output_dir, "hparams.pt")
+  #  hparams = torch.load(hparams_file_name)
+  #  hparams.load_model = args.load_model
+  #  hparams.n_train_steps = args.n_train_steps
+  #else:
+  #  hparams = HParams(**vars(args))
+  hparams = HParams(**vars(args))
   # build or load model
   agent_trainer = ReinforceTrainer(hparams)
   print("-" * 80)
