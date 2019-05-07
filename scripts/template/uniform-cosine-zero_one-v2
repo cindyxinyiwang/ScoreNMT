@@ -12,7 +12,7 @@
 #DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 DDIR=DATA_DIR
 
-python3.6 src/rl_main.py \
+python src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
   --output_dir="outputs_sSEED/uniform-cosine-zero_one-v2_DATA_IL/" \
