@@ -4,20 +4,22 @@ TEMP_DIR=scripts/template/
 CFG_DIR=cfg_s1/
 SEED=1
 DATA=tiny
+DATA_DIR='\/home\/xinyiw\/multv-nmt\/'
 THRESH=15
 
 mkdir -p scripts/"$CFG_DIR"
 # low-resource language codes
 ILS=(
-  slk)
+  aze)
 #  glg)
 
 for i in ${!ILS[*]}; do
   IL=${ILS[$i]}
   echo $IL
   echo $DATA
-  for f in  $TEMP_DIR/uniform-cosine-zero_one $TEMP_DIR/uniform-cosine-one $TEMP_DIR/uniform $TEMP_DIR/cur-cosine-zero_one $TEMP_DIR/cur $TEMP_DIR/hs $TEMP_DIR/hs-cosine-lan_dist $TEMP_DIR/hs-cosine-one $TEMP_DIR/hs-cosine-zero_one; do
-    sed "s/THRESH/$THRESH/g; s/DATA/$DATA/g; s/SEED/$SEED/g; s/IL/$IL/g;" < $f > ${f/template/"$CFG_DIR"/}_"$DATA"_$IL.sh 
+  #for f in  $TEMP_DIR/uniform-cosine-zero_one $TEMP_DIR/uniform-cosine-one $TEMP_DIR/uniform $TEMP_DIR/cur-cosine-zero_one $TEMP_DIR/cur $TEMP_DIR/hs $TEMP_DIR/hs-cosine-lan_dist $TEMP_DIR/hs-cosine-one $TEMP_DIR/hs-cosine-zero_one; do
+  for f in $TEMP_DIR/hs-cosine-zero_one  $TEMP_DIR/hs ; do
+    sed "s/DATA_DIR/$DATA_DIR/g; s/THRESH/$THRESH/g; s/DATA/$DATA/g; s/SEED/$SEED/g; s/IL/$IL/g;" < $f > ${f/template/"$CFG_DIR"/}_"$DATA"_$IL.sh 
     chmod u+x ${f/template/"$CFG_DIR"/}_"$DATA"_$IL.sh 
   done
 done
