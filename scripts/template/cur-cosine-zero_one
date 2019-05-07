@@ -65,4 +65,6 @@ python3.6 src/rl_main.py \
   --feature_type="zero_one" \
   --norm_feature \
   --add_bias=0 \
+  --scale_0 0.05\
+  --scale_1 1 \
   --seed SEED
