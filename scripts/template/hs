@@ -7,9 +7,10 @@
 #export PYTHONPATH="$(pwd)"
 #export CUDA_VISIBLE_DEVICES="0"
 
-DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+#DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 #DDIR=/home/xinyiw1/ScoreNMT/
 #DDIR=/home/hyhieu/xinyiw/ScoreNMT/
+DDIR=DATA_DIR
 
 python3.6 src/rl_main.py \
   --clean_mem_every 5 \
@@ -43,7 +44,7 @@ python3.6 src/rl_main.py \
   --lr 0.001 \
   --n_train_epochs=20 \
   --dropout 0.3 \
-  --max_len 250 \
+  --max_len 300 \
   --agent_subsample_line 160 \
   --print_every 50 \
   --train_score_every=1978056 \
