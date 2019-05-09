@@ -279,7 +279,7 @@ parser.add_argument("--sort_bucket", type=int, default=1, help="temperature for 
 parser.add_argument("--imitate_temperature", type=float, default=1., help="whether to shuffle data in each bucket")
 
 parser.add_argument("--train_on_loaded", action="store_true", help="whether to train agent on loaded data")
-parser.add_argument("--hs_actor_temp", type=int, default=1, help="temperature for heuristic actor")
+parser.add_argument("--hs_actor_temp", type=float, default=1., help="temperature for heuristic actor")
 args = parser.parse_args()
 
 def train():
