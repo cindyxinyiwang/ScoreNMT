@@ -235,32 +235,58 @@ class ReinforceTrainer():
     self.nmt_optim.zero_grad()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)
     print(grad_scale.data)
-    for eps in range(self.hparams.train_score_episode):
-      s_0_list = []
-      s_1_list = []
-      mask_list = []
-      for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example_normal():
-        s = self.featurizer.get_state(src, src_len, trg)
-        step += 1
-        mask = 1 - s[1].byte()
-        s_0_list.append(s[0])
-        s_1_list.append(s[1])
-        mask_list.append(mask)
-        if eop: break
-      s_0 = torch.cat(s_0_list, dim=0)
-      s_1 = torch.cat(s_1_list, dim=0)
-      mask = torch.cat(mask_list, dim=0)
-      a_logits = self.actor([s_0, s_1])
-      a_logits.masked_fill_(mask, -float("inf"))
-        
-      loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
-      loss = (loss * grad_scale * self.hparams.reward_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
-      cur_loss = loss.item()
-      loss.backward()
-      self.actor_optim.step()
-      self.actor_optim.zero_grad()
-      #if step % self.hparams.print_every == 0:
-      #  print("eps={}, actor loss={}".format(eps, cur_loss))
+    if self.hparams.train_on_loaded:
+        s_0_list = []
+        s_1_list = []
+        mask_list = []
+        for s in self.data_loader.data_feature:
+          step += 1
+          mask = 1 - s[1].byte()
+          s_0_list.append(s[0])
+          s_1_list.append(s[1])
+          mask_list.append(mask)
+          if eop: break
+        s_0 = torch.cat(s_0_list, dim=0)
+        s_1 = torch.cat(s_1_list, dim=0)
+        mask = torch.cat(mask_list, dim=0)
+        for eps in range(self.hparams.train_score_episode):
+          a_logits = self.actor([s_0, s_1])
+          a_logits.masked_fill_(mask, -float("inf"))
+            
+          loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
+          loss = (loss * grad_scale * self.hparams.reward_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.train_score_every) 
+          #loss = (loss * grad_scale * self.hparams.reward_scale).sum().div_(self.hparams.train_score_every) 
+          cur_loss = loss.item()
+          loss.backward()
+          self.actor_optim.step()
+          self.actor_optim.zero_grad()
+    else:
+      for eps in range(self.hparams.train_score_episode):
+        s_0_list = []
+        s_1_list = []
+        mask_list = []
+        for src, src_len, trg, iter_percent, eop in self.data_loader.next_raw_example_normal():
+          s = self.featurizer.get_state(src, src_len, trg)
+          step += 1
+          mask = 1 - s[1].byte()
+          s_0_list.append(s[0])
+          s_1_list.append(s[1])
+          mask_list.append(mask)
+          if eop: break
+        s_0 = torch.cat(s_0_list, dim=0)
+        s_1 = torch.cat(s_1_list, dim=0)
+        mask = torch.cat(mask_list, dim=0)
+        a_logits = self.actor([s_0, s_1])
+        a_logits.masked_fill_(mask, -float("inf"))
+          
+        loss = -torch.nn.functional.log_softmax(a_logits, dim=-1)
+        loss = (loss * grad_scale * self.hparams.reward_scale).masked_fill_(mask, 0.).sum().div_(self.hparams.agent_subsample_line) 
+        cur_loss = loss.item()
+        loss.backward()
+        self.actor_optim.step()
+        self.actor_optim.zero_grad()
+        #if step % self.hparams.print_every == 0:
+        #  print("eps={}, actor loss={}".format(eps, cur_loss))
 
   def train_score_all(self):
     step = 0

@@ -467,54 +467,6 @@ class RLDataUtilUnsort(object):
         y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
         eop = (step_b == len(batch_indices)-1)
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop
-   
-  def next_nmt_train_prob_lr(self):
-    src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
-    trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
-    self.load_nmt_train_prob_lr(src, trg)
-    # get start_indices
-    self.train_start_indices, self.train_end_indices = [], []
-    if self.hparams.batcher == "word":
-      start_index, end_index, count = 0, 0, 0
-      while True:
-        count += (len(self.x_train[end_index])+ len(self.y_train[end_index]))
-        end_index += 1
-        if end_index >= len(self.x_train):
-          self.train_start_indices.append(start_index)
-          self.train_end_indices.append(end_index)
-          break
-        if count > self.hparams.batch_size:
-          self.train_start_indices.append(start_index)
-          self.train_end_indices.append(end_index)
-          count = 0
-          start_index = end_index
-    elif self.hparams.batcher == "sent":
-      start_index, end_index, count = 0, 0, 0
-      while end_index < len(x_len):
-        end_index = min(start_index + self.hparams.batch_size, len(x_len))
-        self.train_start_indices.append(start_index)
-        self.train_end_indices.append(end_index)
-        start_index = end_index
-    else:
-      print("unknown batcher")
-      exit(1)
-    while True:
-      batch_indices = np.random.permutation(len(self.train_start_indices))
-      for step_b, batch_idx in enumerate(batch_indices):
-        start_idx, end_idx = self.train_start_indices[batch_idx], self.train_end_indices[batch_idx]
-        x, y, prob = self.x_train[start_idx:end_idx], self.y_train[start_idx:end_idx], self.prob_train[start_idx:end_idx]
-        if self.shuffle:
-          (x, y, prob), _ = self.sort_by_xlen([x, y, prob])
-        # pad
-        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
-        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-        batch_size = len(x)
-        eop = (step_b == len(batch_indices)-1)
-        prob = torch.FloatTensor(prob).view(batch_size, 1)
-        if self.hparams.cuda:
-          prob = prob.cuda()
-        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, prob, batch_size, eop
-
 
   def load_nmt_train_actor_bucketed(self, featurizer, actor):
      x, y = [], []
@@ -622,10 +574,12 @@ class RLDataUtilUnsort(object):
     end_index = min(start_index + num, len(self.data_raw_trg))
     print(start_index, end_index)
     self.x_train, self.y_train, self.lan_id = [], [], []
+    self.data_feature = []
     for idx in range(start_index, end_index):
       src_list, trg, src_len = self.data_raw_src[idx], self.data_raw_trg[idx], self.data_src_len[idx]
       
       s = featurizer.get_state([src_list], [src_len], [trg])
+      self.data_feature.append(s)
       a_logits = actor(s)
       mask = 1 - s[1].byte()
       a_logits.masked_fill_(mask, -float("inf"))
