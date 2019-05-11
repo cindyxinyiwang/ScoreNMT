@@ -13,8 +13,8 @@ DDIR="/home/xinyiw/multv-nmt/"
 #DDIR="/home/hyhieu/xinyiw/ScoreNMT/" 
 
 python3.6 src/translate.py \
-  --model_file="outputs_VERSION/NAME/bleu_final_nmt_model.pt" \
-  --hparams_file="outputs_VERSION/NAME/bleu_final_nmt_hparams.pt" \
+  --model_file="outputs_VERSION/NAME/final_nmt_model.pt" \
+  --hparams_file="outputs_VERSION/NAME/final_nmt_hparams.pt" \
   --test_src_file_list  "$DDIR"data/IL_eng/ted-test.mtok.spmVSIZE.IL \
   --test_trg_file_list  "$DDIR"data_moses/IL_eng/ted-test.mtok.spm8000.eng \
   --test_ref_file_list  "$DDIR"data_moses/IL_eng/ted-test.mtok.eng \
@@ -25,8 +25,8 @@ python3.6 src/translate.py \
   --poly_norm_m=1 \
   --max_len=200 \
   --trans_dev \
-  --log_file="outputs_VERSION/NAME/bleu_trans_log" \
-  --out_file="outputs_VERSION/NAME/bleu-ted-test-b5m1"   
+  --log_file="outputs_VERSION/NAME/trans_log" \
+  --out_file="outputs_VERSION/NAME/ted-test-b5m1"   
 #  --out_file="outputs_exp3/sw-8000_bel_v8_a2/ted-test-b5m1" & 
 #
 #pids+=($!)
