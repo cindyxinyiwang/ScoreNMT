@@ -773,6 +773,7 @@ class Seq2Seq(nn.Module):
           new_hyp_scores = hyp.score + p_t 
         new_hyp_score_list.append(new_hyp_scores)
       live_hyp_num = beam_size - len(completed_hyp)
+      new_hyp_score_list = [l.cpu().numpy() for l in new_hyp_score_list]
       new_hyp_scores = np.concatenate(new_hyp_score_list).flatten()
       new_hyp_pos = (-new_hyp_scores).argsort()[:live_hyp_num]
       prev_hyp_ids = new_hyp_pos / self.hparams.trg_vocab_size
