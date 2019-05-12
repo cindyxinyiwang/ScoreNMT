@@ -21,7 +21,6 @@ for version in version_list:
       name_str, lans = model_dir[0], model_dir[-1]
       IL, RL = lans, lans
       # change vocab size if a different vocab is used
-      vocab_size = 8000
       if "sw-joint" in name_str:
         template = temp_dir["sw-joint"]
       elif "sw-" in name_str: 
@@ -41,6 +40,7 @@ for version in version_list:
         vocab_size = 64000
       if "uni" in name_str:
         vocab_size = 32000
+      vocab_size = 8000
       template = template.replace("IL", IL)
       template = template.replace("RL", RL)
       template = template.replace("NAME", "_".join(model_dir))
