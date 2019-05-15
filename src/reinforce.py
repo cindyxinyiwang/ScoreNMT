@@ -240,7 +240,7 @@ class ReinforceTrainer():
     self.nmt_optim.zero_prev_grad()
     self.nmt_optim.zero_grad()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)
-    print(grad_scale.data)
+    print("grad={}".format(grad_scale.data.cpu().tolist()))
     for eps in range(self.hparams.train_score_episode):
       s_0_list = []
       s_1_list = []

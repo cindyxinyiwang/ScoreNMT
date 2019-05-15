@@ -249,14 +249,24 @@ class RLDataUtil(object):
     self.data_src_len = [[0 for _ in range(self.hparams.lan_size)] for _ in range(len(self.data_raw_trg))]
     cur_num, cur_lan = 0, 0
     lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
+    self.data_bucket, src_exist = {}, []
     with open(src, 'r') as src_file:
       for s in src_file:
         s = s.strip()
         if s == "EOF":
+          src_exist = tuple(src_exist)
+          if not src_exist in self.data_bucket:
+            self.data_bucket[src_exist] = [self.data_raw_src[cur_num], self.data_raw_trg[cur_num], self.data_src_len[cur_num]]
           cur_num += 1
           cur_lan = 0
+          src_exist = []
         else:
           toks = s.split()
+          if len(toks) > 0:
+            src_exist.append(1)
+          else:
+            src_exist.append(0)
+
           if self.hparams.max_len and len(toks) > self.hparams.max_len:
             toks = toks[:self.hparams.max_len]
           s_list = [self.hparams.bos_id]
@@ -471,6 +481,16 @@ class RLDataUtil(object):
             self.y_train.append(trg[:self.hparams.max_len])
           else:
             self.y_train.append(trg)
+    for src_exist, items in self.data_bucket.items():
+      src_list, trg, src_len = items
+      print("src_exist={}".format(src_exist))
+      s = featurizer.get_state([src_list], [src_len], [trg])
+      a_logits = actor(s)
+      mask = 1 - s[1].byte()
+      a_logits.masked_fill_(mask, -float("inf"))
+      prob = torch.nn.functional.softmax(a_logits, -1)
+      prob = [i for i in prob.data.view(-1).cpu().tolist()]
+      print("prob={}".format(prob))
       #prob = [float(repr(p)) for p in prob]
       #prob = np.array(prob) / sum(prob)
       #src_idx = np.random.choice(self.hparams.lan_size, p=prob)
