@@ -15,7 +15,7 @@ DDIR=/home/hyhieu/xinyiw/ScoreNMT/
 python src/rl_main.py \
   --clean_mem_every 5 \
   --reset_output_dir \
-  --output_dir="outputs_s0/uniform-cosine-zero_one_tiny_glg/" \
+  --output_dir="outputs_plots/uniform-cosine-zero_one_tiny_glg/" \
   --train_src_file_list "$DDIR"data/LAN_eng/ted-train.mtok.spm8000.LAN \
   --train_trg_file_list  "$DDIR"data_moses/LAN_eng/ted-train.mtok.spm8000.eng \
   --dev_src_file_list  "$DDIR"data/glg_eng/ted-dev.mtok.spm8000.glg \
