@@ -251,6 +251,7 @@ parser.add_argument("--agent_checkpoint_every", type=int, default=20, help="save
 
 parser.add_argument("--grad_dist", type=str, default="cosine", help="[cosine|dot_prod]")
 parser.add_argument("--reward_scale", type=float, default=1, help="scale of the gradient sim")
+parser.add_argument("--lan_dist_tau", type=float, default=1, help="lan dist temperature")
 args = parser.parse_args()
 
 def train():

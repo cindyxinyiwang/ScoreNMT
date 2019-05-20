@@ -481,22 +481,17 @@ class RLDataUtil(object):
             self.y_train.append(trg[:self.hparams.max_len])
           else:
             self.y_train.append(trg)
-    for src_exist, items in self.data_bucket.items():
-      src_list, trg, src_len = items
-      print("src_exist={}".format(src_exist))
-      s = featurizer.get_state([src_list], [src_len], [trg])
-      a_logits = actor(s)
-      mask = 1 - s[1].byte()
-      a_logits.masked_fill_(mask, -float("inf"))
-      prob = torch.nn.functional.softmax(a_logits, -1)
-      prob = [i for i in prob.data.view(-1).cpu().tolist()]
-      print("prob={}".format(prob))
-      #prob = [float(repr(p)) for p in prob]
-      #prob = np.array(prob) / sum(prob)
-      #src_idx = np.random.choice(self.hparams.lan_size, p=prob)
-      #self.lan_id.append(src_idx)
-      #self.x_train.append(src_list[src_idx])
-      #self.y_train.append(trg)
+    #for src_exist, items in self.data_bucket.items():
+    #  src_list, trg, src_len = items
+    #  print("src_exist={}".format(src_exist))
+    #  s = featurizer.get_state([src_list], [src_len], [trg])
+    #  a_logits = actor(s)
+    #  mask = 1 - s[1].byte()
+    #  a_logits.masked_fill_(mask, -float("inf"))
+    #  prob = torch.nn.functional.softmax(a_logits, -1)
+    #  prob = [i for i in prob.data.view(-1).cpu().tolist()]
+    #  print("prob={}".format(prob))
+
    
   def next_sample_nmt_train(self, featurizer, actor):
     while True:
