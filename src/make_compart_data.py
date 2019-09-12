@@ -4,9 +4,9 @@
 
 data_dir = "/home/xinyiw/multv-nmt/"
 #data_dir = "/projects/tir1/users/xinyiw1/multv-nmt/"
-out_dir = "data/big/"
-lang_file = "langs_big.txt"
-out_src = out_dir + "ted-train.mtok.spm8000.big"
+out_dir = "data/aug/"
+lang_file = "langs_aug.txt"
+out_src = out_dir + "ted-train.mtok.spm8000.aug"
 out_trg = out_dir + "ted-train.mtok.spm8000.eng"
 
 lans = []

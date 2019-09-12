@@ -16,9 +16,10 @@ from collections import defaultdict, deque
 import copy
 import time
 
-class BiasActor(nn.Module):
+
+class SPLActor(nn.Module):
   def __init__(self, hparams, num_feature, lan_dist_vec):
-    super(BiasActor, self).__init__()
+    super(SPLActor, self).__init__()
     self.hparams = hparams
     hidden_size = hparams.d_hidden
     self.lan_dist_vec = Variable(torch.FloatTensor(lan_dist_vec.tolist()) / 10)

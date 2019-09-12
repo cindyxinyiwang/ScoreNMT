@@ -129,6 +129,9 @@ class ReinforceTrainer():
         elif self.hparams.actor_type == "emb":
           self.featurizer = EmbFeaturizer(hparams, self.nmt_model.encoder.word_emb, self.nmt_model.decoder.word_emb, self.data_loader)
           self.actor = EmbActor(hparams, self.data_loader.lan_dist_vec)
+        elif self.hparams.actor_type == "spl":
+          self.featurizer = Featurizer(hparams, self.data_loader)
+          self.actor = SPLActor(hparams, self.featurizer.num_feature, self.data_loader.lan_dist_vec)
         else:
           print("actor not implemented")
           exit(0)
@@ -193,7 +196,29 @@ class ReinforceTrainer():
       self.lr = self.hparams.lr
       self.epoch = 0
       self.baseline = 0
-   
+  
+  def train_spl_score(self):
+    step = 0
+    thresh = 0.407
+    scale = 1-thresh
+    for (x_train, x_mask, x_count, x_len, x_pos_emb_idxs, y_train, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop) in self.data_loader.next_refresh_data():
+      logits = self.nmt_model.forward(x_train, x_mask, x_len, x_pos_emb_idxs, y_train[:,:-1], y_mask[:,:-1], y_len, y_pos_emb_idxs, [], [], file_idx=[], step=step, x_rank=[])
+      logits = logits.view(-1, self.hparams.trg_vocab_size)
+      labels = y_train[:,1:].contiguous().view(-1)
+      cur_nmt_loss = torch.nn.functional.cross_entropy(logits, labels, ignore_index=self.hparams.pad_id, reduction="mean")
+      loss = np.exp(-0.1*cur_nmt_loss.item())
+      #print(loss)
+      #print(lan_id)
+      if loss >= thresh:
+        # actor weight is 0
+        weight = 0
+      else:
+        weight = np.log(loss+scale) / np.log(scale)
+        #weight = np.log(loss+scale)
+      #print(weight)
+      self.actor.bias.weight[0, lan_id[0]] = weight
+      if eop: break
+
   def train_score(self):
     step = 0
     self.nmt_optim.zero_prev_grad()
@@ -794,5 +819,8 @@ class ReinforceTrainer():
       #self.imitate_heuristic()
       if self.hparams.not_train_score or self.hparams.bucketed:
         pass
+      elif self.hparams.spl_actor:
+        print("training spl score...")
+        self.train_spl_score()
       else:
         self.train_score()
