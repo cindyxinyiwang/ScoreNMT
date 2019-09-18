@@ -43,7 +43,6 @@ parser.add_argument("--poly_norm_m", type=float, default=0, help="m in polynormi
 parser.add_argument("--non_batch_translate", action="store_true", help="use non-batched translation")
 parser.add_argument("--batch_size", type=int, default=1, help="")
 parser.add_argument("--merge_bpe", action="store_true", help="")
-parser.add_argument("--src_vocab_list", type=str, default=None, help="name of source vocab file")
 parser.add_argument("--trg_vocab_list", type=str, default=None, help="name of target vocab file")
 parser.add_argument("--n_train_sents", type=int, default=None, help="max number of training sentences to load")
 parser.add_argument("--out_file_list", type=str, default="trans", help="output file for hypothesis")
@@ -54,15 +53,24 @@ parser.add_argument("--nbest", action="store_true", help="whether to return the 
 parser.add_argument("--ppl_only", action="store_true", help="whether to return the nbest list")
 parser.add_argument("--trans_dev", action="store_true", help="whether to return the nbest list")
 parser.add_argument("--out_prefix", type=str, default="", help="output file for logs")
+parser.add_argument("--src_vocab_list", type=str, default="", help="output file for logs")
+parser.add_argument("--src_char_vocab_from", type=str, default="", help="output file for logs")
+parser.add_argument("--trg_vocab", type=str, default="", help="output file for logs")
 
 def test(model, hparams_file, ppl_only, trans_dev, out_file_list, log_file, test_src_file_list, test_trg_file_list, test_ref_file_list, \
-        test_file_idx_list, cuda, beam_size, max_len, poly_norm_m, batch_size, merge_bpe, out_prefix):
+        test_file_idx_list, cuda, beam_size, max_len, poly_norm_m, batch_size, merge_bpe, out_prefix, src_vocab_list=None, src_char_vocab_from=None, trg_vocab=None):
   hparams_file_name = hparams_file
   train_hparams = torch.load(hparams_file_name)
   hparams = TranslationHparams()
   for k, v in train_hparams.__dict__.items():
     setattr(hparams, k, v)
-  
+  if src_vocab_list:
+    hparams.src_vocab_list = src_vocab_list
+  if src_char_vocab_from:
+    hparams.src_char_vocab_from = src_char_vocab_from
+  if trg_vocab:
+    hparams.trg_vocab = trg_vocab
+
   if not ppl_only:
     out_file_list = out_file_list.split(",")
     print("writing translation to " + str(out_file_list))
@@ -261,5 +269,5 @@ if __name__ == "__main__":
     model = torch.load(model_file_name)
   model.eval()
   test(model, args.hparams_file, args.ppl_only, args.trans_dev, args.out_file_list, args.log_file, args.test_src_file_list, args.test_trg_file_list, args.test_ref_file_list, \
-        args.test_file_idx_list, args.cuda, args.beam_size, args.max_len, args.poly_norm_m, args.batch_size, args.merge_bpe, args.out_prefix)
+        args.test_file_idx_list, args.cuda, args.beam_size, args.max_len, args.poly_norm_m, args.batch_size, args.merge_bpe, args.out_prefix, args.src_vocab_list, args.src_char_vocab_from, args.trg_vocab)
 

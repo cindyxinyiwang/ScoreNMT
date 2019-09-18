@@ -582,8 +582,13 @@ class RLDataUtilUnsort(object):
       self.data_feature.append(s)
       a_logits = actor(s)
       mask = 1 - s[1].byte()
-      a_logits.masked_fill_(mask, -float("inf"))
-      a, prob = sample_action(a_logits, temp=1., log=False)
+      if self.hparams.softmax_action:
+        a_logits.masked_fill_(mask, -float("inf"))
+        a, prob = sample_action(a_logits, temp=1., log=False, softmax=self.hparams.softmax_action)
+      else:
+        a_logits.masked_fill_(mask, 0.)
+        a, prob = sample_action(a_logits, temp=1., log=False, softmax=self.hparams.softmax_action)
+
       if idx % 1000 == 0:
         #print(s[1])
         print("lan_probs="+str(prob))

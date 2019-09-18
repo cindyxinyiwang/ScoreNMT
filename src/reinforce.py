@@ -260,6 +260,14 @@ class ReinforceTrainer():
     self.nmt_optim.zero_grad()
     grad_scale = torch.stack([grad_cosine_sim[idx] for idx in range(self.hparams.lan_size)]).view(1, -1)
     print(grad_scale.data)
+
+    if self.hparams.just_grad:
+        for idx in range(self.hparams.lan_size):
+            if grad_cosine_sim[idx].item() < 0 and not self.hparams.softmax_action:
+              self.actor.bias.weight[0, idx] = 0
+            else:
+              self.actor.bias.weight[0, idx] = grad_cosine_sim[idx]
+        return
     if self.hparams.train_on_loaded:
         s_0_list = []
         s_1_list = []

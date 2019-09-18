@@ -27,10 +27,12 @@ class SPLActor(nn.Module):
     self.bias = torch.nn.Linear(self.hparams.lan_size, 1)
     for p in self.bias.parameters():
       init.uniform_(p, -self.hparams.actor_init_range, self.hparams.actor_init_range)
-      
     if self.hparams.add_bias:
       self.bias.weight = torch.nn.Parameter(torch.FloatTensor([[self.hparams.bias for _ in range(self.hparams.lan_size)]]))
       self.bias.weight.requires_grad = False
+    if self.hparams.softmax_action == 0:
+      self.bias.weight.data.fill_(0.)
+
     if self.hparams.cuda:
       self.bias = self.bias.cuda()
 

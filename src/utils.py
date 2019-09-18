@@ -13,11 +13,15 @@ import torch.nn as nn
 import torch.nn.init as init
 
 
-def sample_action(a_logits, temp=0.01, log=False):
+def sample_action(a_logits, temp=0.01, log=False, softmax=1):
   if log:
     print(a_logits)
-  prob = torch.nn.functional.softmax(a_logits * temp, -1)
-  #prob = a_logits / a_logits.sum(dim=-1)
+  if softmax:
+    prob = torch.nn.functional.softmax(a_logits * temp, -1)
+  else:
+    if a_logits.sum().item() == 0.:
+      a_logits.fill_(0.1)
+    prob = a_logits / a_logits.sum(dim=-1)
   a = torch.distributions.Categorical(prob).sample()
   prob = [i for i in prob.data.view(-1).cpu().numpy()]
   if log:
