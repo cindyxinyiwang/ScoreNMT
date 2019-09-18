@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.init as init
 
 
-def sample_action(a_logits, temp=0.01, log=False, softmax=1):
+def sample_action(a_logits, temp=0.01, log=False, softmax=1, mask=None):
   if log:
     print(a_logits)
   if softmax:
@@ -21,6 +21,8 @@ def sample_action(a_logits, temp=0.01, log=False, softmax=1):
   else:
     if a_logits.sum().item() == 0.:
       a_logits.fill_(0.1)
+      if mask is not None:
+          a_logits.masked_fill_(mask, 0.)
     prob = a_logits / a_logits.sum(dim=-1)
   a = torch.distributions.Categorical(prob).sample()
   prob = [i for i in prob.data.view(-1).cpu().numpy()]

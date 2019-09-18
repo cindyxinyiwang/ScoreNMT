@@ -587,7 +587,7 @@ class RLDataUtilUnsort(object):
         a, prob = sample_action(a_logits, temp=1., log=False, softmax=self.hparams.softmax_action)
       else:
         a_logits.masked_fill_(mask, 0.)
-        a, prob = sample_action(a_logits, temp=1., log=False, softmax=self.hparams.softmax_action)
+        a, prob = sample_action(a_logits, temp=1., log=False, softmax=self.hparams.softmax_action, mask=mask)
 
       if idx % 1000 == 0:
         #print(s[1])
