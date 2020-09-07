@@ -281,76 +281,6 @@ class RLDataUtil(object):
           cur_lan += 1
     return lan_src_counts
 
-  def load_raw_data_bucketed(self, src, trg, trg_lines):
-    lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
-    data_raw_trg = []
-    for trg_line in trg_lines:
-      toks = trg_line.split()
-      if self.hparams.max_len and len(toks) > self.hparams.max_len:
-        toks = toks[:self.hparams.max_len]
-      t_list = [self.hparams.bos_id]
-      for tok in toks:
-        if tok in self.trg_w2i:
-          t_list.append(self.trg_w2i[tok])
-        else:
-          t_list.append(self.hparams.unk_id)
-      t_list.append(self.hparams.eos_id)
-      data_raw_trg.append(t_list)
-    
-    cur_num, cur_lan = 0, 0
-    src_sents, src_exist = [], []
-    lan_src_counts = [0 for _ in range(self.hparams.lan_size)]
-    self.data_raw = {}
-    self.data_raw_bucket_instance_count = {}
-    with open(src, 'r') as src_file:
-      for s in src_file:
-        s = s.strip()
-        if s == "EOF":
-          bucket_key = tuple(src_exist)
-          if bucket_key not in self.data_raw:
-            self.data_raw[bucket_key] = []
-          src_len = [len(ss) for ss in src_sents]
-          self.data_raw[bucket_key].append([src_sents, data_raw_trg[cur_num], src_len])
-          if bucket_key not in self.data_raw_bucket_instance_count:
-            self.data_raw_bucket_instance_count[bucket_key] = 0
-          self.data_raw_bucket_instance_count[bucket_key] += 1
-          src_sents, src_exist = [], []
-          cur_num += 1
-          cur_lan = 0
-        else:
-          toks = s.split()
-          if self.hparams.max_len and len(toks) > self.hparams.max_len:
-            toks = toks[:self.hparams.max_len]
-          s_list = [self.hparams.bos_id]
-          for tok in toks:
-            if tok in self.src_w2i:
-              s_list.append(self.src_w2i[tok])
-            else:
-              s_list.append(self.hparams.unk_id)
-          if len(toks) > 0:
-            lan_src_counts[cur_lan] += 1
-          s_list.append(self.hparams.eos_id)
-          src_sents.append(s_list)
-          src_exist.append(len(s_list) > 2)
-          cur_lan += 1
-    self.data_raw_keys = list(self.data_raw.keys())
-    # sort by y for each bucket
-    for key in self.data_raw_keys:
-      self.data_raw[key].sort(key = lambda x:len(x[1]))
-      # bucket the data for sorting
-      if len(self.data_raw[key]) > 1000:
-        data_list = []
-        start, end = 0, 0
-        while end < len(self.data_raw[key]):
-          end = min(len(self.data_raw[key]), start+1000)
-          data_list.append(self.data_raw[key][start:end])
-          start = end
-        self.data_raw[key] = data_list
-      else:
-        self.data_raw[key] = [self.data_raw[key]]
-    return lan_src_counts
-
-
   def get_lan_dist(self):
     self.lan_dists = [[-1 for _ in range(self.hparams.lan_size)] for _ in range(self.hparams.lan_size)]
     with open(self.hparams.lan_dist_file, 'r') as myfile:
@@ -362,29 +292,6 @@ class RLDataUtil(object):
 
   def query_lan_dist(self, id_1, id_2):
     return self.lan_dists[id_1][id_2]
-
-  def get_char_emb(self, word_idx, is_trg=True):
-    if is_trg:
-      w2i, i2w, vsize = self.trg_char_w2i, self.trg_char_i2w, self.hparams.trg_char_vsize
-      word = self.trg_i2w_list[0][word_idx]
-    else:
-      w2i, i2w, vsize = self.src_char_w2i, self.src_char_i2w, self.hparams.src_char_vsize
-      word = self.src_i2w_list[0][word_idx]
-    if self.hparams.char_ngram_n > 0 or self.hparams.bpe_ngram:
-      if word_idx == self.hparams.bos_id or word_idx == self.hparams.eos_id:
-        kv = {0:0}
-      elif self.hparams.char_ngram_n:
-        kv = self._get_ngram_counts(word, i2w, w2i, self.hparams.char_ngram_n)
-      elif self.hparams.bpe_ngram:
-        kv = self._get_bpe_ngram_counts(word, i2w, w2i)
-      key = torch.LongTensor([[0 for _ in range(len(kv.keys()))], list(kv.keys())])
-      val = torch.FloatTensor(list(kv.values()))
-      ret = [torch.sparse.FloatTensor(key, val, torch.Size([1, vsize]))]
-    elif self.hparams.char_input is not None:
-      ret = self._get_char(word, i2w, w2i, n=self.hparams.n)
-      ret = Variable(torch.LongTensor(ret).unsqueeze(0).unsqueeze(0))
-      if self.hparams.cuda: ret = ret.cuda()
-    return ret
 
   def next_refresh_data(self):
     while True:
@@ -433,55 +340,6 @@ class RLDataUtil(object):
           yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id_list, eop
  
 
-  def next_base_data(self):
-    x_train, y_train, x_char_kv, x_len, x_rank = self._build_parallel(self.train_src_file_list[self.hparams.base_lan_id], self.train_trg_file_list[self.hparams.base_lan_id], 0, outprint=False, load_full=True)
-    start_indices, end_indices = [], []
-    if self.hparams.batcher == "word":
-      start_index, end_index, count = 0, 0, 0
-      max_len, sent = 0, 0
-      while True:
-        #count += (len(x_train[end_index])+ len(y_train[end_index]))
-        max_len = max(max_len, len(x_train[end_index]))
-        max_len = max(max_len, len(y_train[end_index]))
-        sent += 1
-        count = 2*sent*max_len
-        end_index += 1
-        if end_index >= len(x_train):
-          start_indices.append(start_index)
-          end_indices.append(end_index)
-          break
-        if count > self.hparams.batch_size:
-          start_indices.append(start_index)
-          end_indices.append(end_index)
-          count = 0
-          sent = 0
-          max_len = 0
-          start_index = end_index
-    elif self.hparams.batcher == "sent":
-      start_index, end_index, count = 0, 0, 0
-      while end_index < len(x_len):
-        end_index = min(start_index + self.hparams.batch_size, len(x_len))
-        start_indices.append(start_index)
-        end_indices.append(end_index)
-        start_index = end_index
-    else:
-      print("unknown batcher")
-      exit(1)
-    while True:
-      batch_indices = np.random.permutation(len(start_indices))
-      for step_b, batch_idx in enumerate(batch_indices):
-        start_idx, end_idx = start_indices[batch_idx], end_indices[batch_idx]
-        x, y = x_train[start_idx:end_idx], y_train[start_idx:end_idx]
-        batch_size = len(x)
-        lan_id =  [self.hparams.base_lan_id for _ in range(batch_size)]
-        if self.shuffle:
-          (x, y, lan_id), _ = self.sort_by_xlen([x, y, lan_id])
-        # pad
-        x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
-        y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-        eop = (step_b == len(batch_indices)-1)
-        yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop
-   
   def next_nmt_train_prob_lr(self):
     src = "data/{}/ted-train.mtok.spm8000.{}".format(self.hparams.data_name, self.hparams.data_name)
     trg = "data/{}/ted-train.mtok.spm8000.eng".format(self.hparams.data_name)
@@ -528,132 +386,6 @@ class RLDataUtil(object):
         if self.hparams.cuda:
           prob = prob.cuda()
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, prob, batch_size, eop
-
-
-  def load_nmt_train_actor_bucketed(self, featurizer, actor):
-     x, y = [], []
-     lan_selected_times = [0 for _ in range(self.hparams.lan_size)]
-     
-     if self.hparams.batcher == "word":
-       start_index, end_index, count, max_len = 0, 0, 0, 0
-       bucket_change, sampled_idx = True, 0
-       while True:
-         src_list, trg, src_len = self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_list_idx][self.cur_bucket_line]
-         if bucket_change:
-           s = featurizer.get_state([src_list], [src_len], [trg])
-           a_logits = actor(s)
-           mask = 1 - s[1].byte()
-           a_logits.masked_fill_(mask, -float("inf"))
-           prob = torch.nn.functional.softmax(a_logits, -1)
-           prob = [float(repr(i)) for i in prob.data.view(-1).cpu().numpy()]
-           prob = np.array(prob)
-           prob = (prob / sum(prob)).tolist()
-           src_idx_list = np.random.choice(self.hparams.lan_size, 50, p=prob).tolist()
-           #src_idx_list = torch.distributions.Categorical(prob).sample_n(40).data
-           bucket_change, sampled_idx = False, 0
-
-           if self.cur_bucket_line % 1000 == 0:
-             print("lan_probs="+str(prob))
-
-         x_tmp, y_tmp, selected_idx = [], [], []
-         bucket_instance_count = self.data_raw_bucket_instance_count[self.data_raw_keys[self.cur_bucket]]
-         if self.hparams.sample_all:
-           for src_idx, p in enumerate(prob):
-             if random.random() < p:
-               x_tmp.append(src_list[src_idx])
-               y_tmp.append(trg)
-               #count += (len(x_tmp[-1]) + len(y_tmp[-1]))
-               count += 1
-               max_len = max(max_len, len(x_tmp[-1]))
-               max_len = max(max_len, len(y_tmp[-1]))
-               selected_idx.append(src_idx)
-         else:
-           src_idx = src_idx_list[sampled_idx]
-           sampled_idx += 1
-           if sampled_idx >= 50: bucket_change=True
-           x_tmp.append(src_list[src_idx])
-           y_tmp.append(trg)
-           #count += (len(x_tmp[-1]) + len(y_tmp[-1]))
-           count += 1
-           max_len = max(max_len, len(x_tmp[-1]))
-           max_len = max(max_len, len(y_tmp[-1]))
-           selected_idx.append(src_idx)
-         #count_words = count
-         count_words = max_len * 2 * count
-         if count_words > self.hparams.batch_size:
-           break
-         else:
-           self.cur_bucket_line += 1
-           x.extend(x_tmp)
-           y.extend(y_tmp)
-           for idx in selected_idx:
-             lan_selected_times[idx] += 1
-
-         if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_list_idx]): 
-           self.cur_bucket_line = 0
-           self.cur_bucket_list_idx += 1
-         if self.cur_bucket_list_idx >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
-           bucket_change = True
-           self.cur_bucket_list_idx = 0
-           self.cur_bucket += 1
-           if self.cur_bucket < len(self.data_raw_keys):
-             random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
-         if self.cur_bucket >= len(self.data_raw_keys):
-           self.cur_bucket = 0
-           self.cur_bucket_line = 0
-           self.cur_bucket_list_idx = 0
-           bucket_change = True
-           random.shuffle(self.data_raw_keys)
-           if count > 0:
-             break
-     elif self.hparams.batcher == "sent":
-       print("unknown batcher")
-       exit(1)
-     else:
-       print("unknown batcher")
-       exit(1)
-     return x, y, [src_list], [src_len], [trg], lan_selected_times, bucket_instance_count / len(x)
-   
-  def next_sample_nmt_train_bucketed(self, featurizer, actor):
-    step = 0
-    while True:
-      step += 1
-      x, y, x_raw, x_raw_len, y_raw, lan_selected_times, bucket_instance_count = self.load_nmt_train_actor_bucketed(featurizer, actor)
-      batch_size = len(x)
-      if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]][self.cur_bucket_list_idx]): 
-        self.cur_bucket_line = 0
-        self.cur_bucket_list_idx += 1
-      if self.cur_bucket_list_idx >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
-        bucket_change = True
-        self.cur_bucket_list_idx = 0
-        self.cur_bucket += 1
-        if self.cur_bucket < len(self.data_raw_keys):
-          random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
-      if self.cur_bucket >= len(self.data_raw_keys):
-        self.cur_bucket = 0
-        self.cur_bucket_line = 0
-        self.cur_bucket_list_idx = 0
-        bucket_change = True
-        random.shuffle(self.data_raw_keys)
-
-      #if self.cur_bucket_line >= len(self.data_raw[self.data_raw_keys[self.cur_bucket]]): 
-      #  self.cur_bucket_line = 0
-      #  self.cur_bucket += 1
-      #  if self.hparams.shuffle_bucket and self.cur_bucket < len(self.data_raw_keys):
-      #    random.shuffle(self.data_raw[self.data_raw_keys[self.cur_bucket]])
-      #if self.cur_bucket >= len(self.data_raw_keys):
-      #  self.cur_bucket = 0
-      #  self.cur_bucket_line = 0
-      #  random.shuffle(self.data_raw_keys)
-      if step % self.hparams.print_every == 0:
-        print("lan_selected_times="+str(lan_selected_times))
-      if self.shuffle:
-        (x, y), _ = self.sort_by_xlen([x, y])
-      # pad
-      x, x_mask, x_count, x_len, x_pos_emb_idxs, _, x_rank = self._pad(x, self.hparams.pad_id)
-      y, y_mask, y_count, y_len, y_pos_emb_idxs, y_char, y_rank = self._pad(y, self.hparams.pad_id)
-      eop = (self.cur_bucket==0 and self.cur_bucket_line==0 and self.cur_bucket_list_idx == 0)
-      yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, x_raw, x_raw_len, y_raw, lan_selected_times, eop, bucket_instance_count
 
   def load_nmt_train_actor(self, start_index, num, featurizer, actor):
     end_index = min(start_index + num, len(self.data_raw_trg))
@@ -796,15 +528,6 @@ class RLDataUtil(object):
         eop = (step_b == len(batch_indices)-1)
         yield x, x_mask, x_count, x_len, x_pos_emb_idxs, y, y_mask, y_count, y_len, y_pos_emb_idxs, batch_size, lan_id, eop
  
-  def next_raw_example_bucketed(self):
-    while True:
-      for data_key, data_item in self.data_raw.items():
-        for item_idx, item in enumerate(data_item[0][:1]):
-          src, trg, src_len = item
-          eop = (data_key==self.data_raw_keys[-1] and item_idx == 0)
-          #print(data_key, self.data_raw_keys[-1])
-          yield [src], [src_len], [trg], -1, eop
-
   def next_raw_example_normal(self):
     max_step = self.hparams.agent_subsample_line/self.hparams.raw_batch_size
     while True:
